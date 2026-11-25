@@ -1,0 +1,14 @@
+boto3
+python-dotenv
+mcp<2
+pydantic>=2,<3
+langgraph
+langgraph-checkpoint-sqlite
+langchain-core
+langchain-aws
+langchain-mcp-adapters
+langfuse>=4.10,<5
+opensearch-py>=3,<4
+jsonschema
+pyyaml
+pytest

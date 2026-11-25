@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.sqlite
+results/
+# Dataset copy: contains restricted source documents (manager_playbook). Never committed.
+data/
