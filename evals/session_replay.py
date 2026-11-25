@@ -32,9 +32,26 @@ def src_match(path: str, spec: str) -> bool:
     return path == spec or path.endswith("/" + spec)
 
 
-def check_turn(t: dict, answer: str, tools: list, sources: list) -> list:
-    """Binding fields only. Returns a list of failure strings (empty = pass)."""
+def check_args(t: dict, calls: list) -> list:
+    """Argument correctness for tools we share with the reference (same names and arg names).
+    `equals` (an id): EVERY call to that tool must use it, so a lookup for the wrong Maya is a failure.
+    `contains` (a name): at least one call must. A tool that was not called is a selection question, not this one."""
     fails = []
+    for c in t.get("arg_checks") or []:
+        mine = [x["args"] for x in calls if x["tool"] == c["tool"] and c["arg"] in (x.get("args") or {})]
+        if not mine:
+            continue
+        if "equals" in c:
+            fails += [f"{c['tool']}.{c['arg']}={a[c['arg']]!r}, expected {c['equals']!r}" for a in mine
+                      if a[c["arg"]] != c["equals"]]
+        elif "contains" in c and not any(c["contains"].lower() in str(a[c["arg"]]).lower() for a in mine):
+            fails.append(f"{c['tool']}.{c['arg']} never contains {c['contains']!r}")
+    return fails
+
+
+def check_turn(t: dict, answer: str, tools: list, sources: list, calls: list | None = None) -> list:
+    """Binding fields only. Returns a list of failure strings (empty = pass)."""
+    fails = check_args(t, calls or [])
     if t.get("should_use_tools") is not None and bool(tools) != t["should_use_tools"]:
         fails.append(f"tool use {bool(tools)} != {t['should_use_tools']}")
     fails += [f"missing fact {f!r}" for f in t.get("required_facts") or [] if not has(answer, f)]
@@ -64,7 +81,7 @@ def run_session(s: dict, run: int, ck: Path, handle_turn) -> dict:
     out = {}
     for t in s["turns"]:
         r = handle_turn(caller, group, f"{s['id']}#{run}", t["user"], AS_OF, checkpoint_path=ck)
-        fails = check_turn(t, r.answer, r.tool_sequence, r.sources)
+        fails = check_turn(t, r.answer, r.tool_sequence, r.sources, r.extra.get("tool_calls"))
         out[str(t["n"])] = {"ok": not fails, "fails": fails, "tools": r.tool_sequence, "status": r.status,
                             "intent": r.intent}
         print(f"{s['id']}#{run} t{t['n']} {'FAIL' if fails else 'ok  '} intent={r.intent} status={r.status} "

@@ -1,0 +1,27 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t12: missing '2026-08-01|August 1|Aug 1|1 August' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S2-onboarding-maya t12: missing 'Finance' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S2-onboarding-maya t12: missing 'pending' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)"
+ ],
+ "closed": [
+  "S2-onboarding-maya t8: closed-branch word 'Rachel' in answer",
+  "S3-intent-shift t8: durable fact lost or tools used (tools=['get_employee'])"
+ ],
+ "citations": [
+  "S2-onboarding-maya t2: tool-backed answer cites nothing",
+  "S2-onboarding-maya t3: tool-backed answer cites nothing",
+  "S2-onboarding-maya t4: tool-backed answer cites nothing",
+  "S2-onboarding-maya t8: tool-backed answer cites nothing",
+  "S9-maya-own-account t3: tool-backed answer cites nothing",
+  "S9-maya-own-account t5: tool-backed answer cites nothing"
+ ],
+ "writes": [],
+ "handoff": [
+  "S2-onboarding-maya t10: no typed handoff (extra.handoff missing)"
+ ],
+ "restart": []
+}

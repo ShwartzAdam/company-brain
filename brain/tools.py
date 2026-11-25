@@ -4,6 +4,13 @@ from brain import db, people, retrieval
 
 # ---------- reads ----------
 
+def _cite(rows: list[dict], table: str, key: str) -> list[dict]:
+    """Every database row carries the source an answer can cite, like a document path: db:<table>/<id>."""
+    for r in rows:
+        r["source"] = f"db:{table}/{r[key]}"
+    return rows
+
+
 CORPORA = ("contracts", "employment", "handbook", "internal_memos", "it_kb", "manager_playbook", "policies")
 
 
@@ -18,18 +25,16 @@ def search_documents(query: str, caller_id: str, corpus: str | None = None, k: i
 def get_employee(query: str) -> list[dict]:
     """Find employees by id, email or name; returns id, role, manager, group."""
     like = f"%{query}%"
-    return db.rows(
+    return _cite(db.rows(
         "SELECT employee_id, full_name, email, role, department_id, manager_id, location, "
         "employment_type, status, user_group_id FROM employees "
         "WHERE employee_id = ? OR lower(email) = lower(?) OR lower(full_name) LIKE lower(?) "
-        "ORDER BY full_name", (query, query, like))
-
+        "ORDER BY full_name", (query, query, like)), "employees", "employee_id")
 
 def list_direct_reports(manager_id: str) -> list[dict]:
     """List the employees who report to a manager id."""
-    return db.rows("SELECT employee_id, full_name, role, status FROM employees "
-                   "WHERE manager_id = ? ORDER BY full_name", (manager_id,))
-
+    return _cite(db.rows("SELECT employee_id, full_name, role, status FROM employees "
+                   "WHERE manager_id = ? ORDER BY full_name", (manager_id,)), "employees", "employee_id")
 
 def check_software_subscription(software: str) -> list[dict]:
     """Seat limit, ACTIVE seats, over-limit flag, annual cost and renewal date for a software/vendor name."""
@@ -43,46 +48,42 @@ def check_software_subscription(software: str) -> list[dict]:
     for s in out:
         s["seats_available"] = s["seat_limit"] - s["active_seats"]
         s["over_limit"] = s["active_seats"] > s["seat_limit"]
-    return out
+    return _cite(out, "software_subscriptions", "subscription_id")
 
 
 def get_contract(query: str) -> list[dict]:
     """By contract id, vendor name or system name. Includes the contract document path."""
     like = f"%{query}%"
-    return db.rows(
+    return _cite(db.rows(
         "SELECT c.contract_id, v.vendor_name, sys.system_name, c.contract_name, c.document_path, "
         "c.start_date, c.end_date, c.renewal_type, c.renewal_notice_days, c.annual_cost, "
         "c.owner_department_id, c.status, c.security_review_required FROM contracts c "
         "JOIN vendors v ON c.vendor_id = v.vendor_id JOIN systems sys ON c.system_id = sys.system_id "
         "WHERE c.contract_id = ? OR lower(v.vendor_name) LIKE lower(?) OR lower(sys.system_name) LIKE lower(?) "
-        "ORDER BY c.contract_id", (query, like, like))
-
+        "ORDER BY c.contract_id", (query, like, like)), "contracts", "contract_id")
 
 def list_onboarding_tasks(employee_id: str) -> list[dict]:
     """Onboarding checklist tasks and their status for an employee id."""
-    return db.rows("SELECT task_id, task_type, description, owner_group, status, due_date, related_system_id "
-                   "FROM onboarding_tasks WHERE employee_id = ? ORDER BY due_date, task_id", (employee_id,))
-
+    return _cite(db.rows("SELECT task_id, task_type, description, owner_group, status, due_date, related_system_id "
+                   "FROM onboarding_tasks WHERE employee_id = ? ORDER BY due_date, task_id", (employee_id,)), "onboarding_tasks", "task_id")
 
 def check_asset_inventory(asset_type: str = "", location: str = "") -> list[dict]:
     """Hardware assets by type and location with status."""
-    return db.rows("SELECT asset_id, asset_type, model, status, location, employee_id, notes FROM assets "
+    return _cite(db.rows("SELECT asset_id, asset_type, model, status, location, employee_id, notes FROM assets "
                    "WHERE lower(asset_type) LIKE lower(?) AND lower(location) LIKE lower(?) "
-                   "ORDER BY asset_type, asset_id", (f"%{asset_type}%", f"%{location}%"))
-
+                   "ORDER BY asset_type, asset_id", (f"%{asset_type}%", f"%{location}%")), "assets", "asset_id")
 
 def list_employee_tickets(employee_id: str, status: str = "") -> list[dict]:
     """Tickets for an employee id, optionally by status."""
-    return db.rows("SELECT ticket_id, category, subcategory, priority, status, subject, created_at, "
+    return _cite(db.rows("SELECT ticket_id, category, subcategory, priority, status, subject, created_at, "
                    "assigned_team, related_system_id FROM tickets "
                    "WHERE employee_id = ? AND lower(status) LIKE lower(?) ORDER BY created_at DESC",
-                   (employee_id, f"%{status}%"))
-
+                   (employee_id, f"%{status}%")), "tickets", "ticket_id")
 
 def read_approval(request_id: str) -> list[dict]:
     """Approvals attached to an access request (e.g. AR001 -> AP001, AP002)."""
-    return db.rows("SELECT approval_id, request_type, request_id, approver_id, status, decision_reason, "
-                   "created_at FROM approvals WHERE request_id = ? ORDER BY approval_id", (request_id,))
+    return _cite(db.rows("SELECT approval_id, request_type, request_id, approver_id, status, decision_reason, "
+                   "created_at FROM approvals WHERE request_id = ? ORDER BY approval_id", (request_id,)), "approvals", "approval_id")
 
 # ---------- writes ----------
 

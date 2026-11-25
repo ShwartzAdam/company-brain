@@ -46,7 +46,9 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
                 out = await g.ainvoke({"message": message}, cfg)
             r = TurnResult(out["answer"], out["status"], out["scope"], out["visible"],
                            [t["tool"] for t in out["tool_log"]], out["sources"], out["plan"]["intent"],
-                           request_id, out["error"])
+                           request_id, out["error"],
+                           extra={"tool_calls": [t for t in out["tool_log"] if not t.get("rejected")],
+                                  "evidence": out["evidence"]})
             get_client().update_current_span(
                 input=message, output=r.answer,
                 metadata={"caller_id": caller_id, "caller_group": caller_group, "scope": r.scope,
