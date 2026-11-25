@@ -11,6 +11,9 @@ from brain import config, llm, people
 SRC = ["text", "source", "corpus", "audience", "title", "section"]
 POOL = 30      # candidates fetched per query before fusion/rerank
 RRF_K = 60
+POLICY_POOL = 10
+RESERVE_POLICY = True
+RESERVED = 2# result slots reserved for the best policy chunks
 
 
 def audience_filter(caller_id: str) -> list:
@@ -67,6 +70,20 @@ def rerank(query: str, hits: list[dict], n: int) -> list[dict]:
     return [hits[i] for i in picked[:n]]
 
 
+def _reserve_policy(query: str, caller_id: str, hits: list[dict], q) -> list[dict]:
+    """Questions that name a person or product match files about them, not the rule that governs
+    the answer. If no policy chunk made the cut, swap the last slot for the best policy chunk,
+    found by a search restricted to corpus=policies (same audience filter)."""
+    pol = rrf([q(build_body(query, caller_id, POLICY_POOL, "policies")),
+               q(build_keyword_body(query, caller_id, POLICY_POOL, "policies"))])
+    if not pol:
+        return hits
+    picks = rerank(query, pol[:POLICY_POOL], RESERVED)  # the model picks the governing rule among policies only
+    have = {h["_id"] for h in picks}
+    keep = [h for h in hits if h["_id"] not in have][:len(hits) - len(picks)]
+    return keep + picks
+
+
 @observe(as_type="retriever", name="retrieval.search", capture_input=False, capture_output=False)
 def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os_client=None,
            mode: str = "rerank") -> list[dict]:
@@ -81,6 +98,8 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
     else:
         fused = rrf([vec, q(build_keyword_body(query, caller_id, POOL, corpus))])
         hits = fused[:k] if mode == "hybrid" else rerank(query, fused[:POOL], k)
+        if mode == "rerank" and corpus is None and RESERVE_POLICY:
+            hits = _reserve_policy(query, caller_id, hits, q)
     res = [{**h["_source"], "score": round(h.get("_score") or 0, 4)} for h in hits]
     # Metadata shows what was filtered and which documents reached the model: paths, never text.
     get_client().update_current_span(
