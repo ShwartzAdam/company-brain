@@ -8,7 +8,7 @@ from typing import Annotated, TypedDict
 
 from langfuse import get_client, observe
 
-from brain import gate, llm
+from brain import checklist, gate, llm
 from brain.handoff import WebexHandoff, make_key
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
 from brain.scope import READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
@@ -25,6 +25,7 @@ class State(TypedDict, total=False):
     handoffs: dict        # idempotency key -> handoff already made in this conversation
     handoff: dict         # this turn's handoff, if any
     handoff_calls: int
+    checklist: dict
     closed: list          # intents of topics the user closed (their raw turns and rows are dropped)
     # per turn
     message: str
@@ -70,7 +71,7 @@ async def classify(state: State, config) -> dict:
                                                                    and any(i in f for i in ids))]
             closed.append(prev)
         facts.append(f"decision: closed - {plan.closes_topic}")
-    return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "facts": _union(facts, plan.relevant_facts),
+    return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "checklist": None, "facts": _union(facts, plan.relevant_facts),
             "constraints": _union(state.get("constraints"), plan.relevant_constraints),
             "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": []}
 
@@ -111,11 +112,12 @@ async def gather(state: State, config) -> dict:
     visible, ev, log, srcs = state["visible"], list(state["evidence"]), list(state["tool_log"]), list(state["sources"])
     error = ""
     bad = 0
+    needed, nudged = TurnPlan(**state["plan"]).lookups_needed, False
     for _ in range(MAX_STEPS):
         user = (f"Caller employee id (use it ONLY for 'me'/'my'; any other person needs their own lookup): {box.caller_id}\n"
                 f"Constraints: {state.get('constraints')}\nFacts: {state.get('facts')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
-                f"Newest message:\n{state['message']}\n\nEvidence so far:\n{_evidence_text(ev)}")
+                f"Newest message:\n{state['message']}\n\nLookups this question needs: {needed or '(not listed)'}\n\nEvidence so far:\n{_evidence_text(ev)}")
         schema = {"type": "object", "properties": {"tool": {"type": "string", "enum": list(visible)},
                                                    "args": {"type": "object"}, "done": {"type": "boolean"}}}
         try:
@@ -128,6 +130,11 @@ async def gather(state: State, config) -> dict:
                 break
             continue
         if act.get("done") or not act.get("tool"):
+            made = sum(1 for t in log if not t.get("rejected"))
+            if needed and made < min(len(needed), 3) and not nudged:  # one bounded refinement, never a search-until-found loop
+                nudged = True
+                ev.append({"tool": "(planner)", "args": {}, "result": f"NOT DONE: the question still needs {needed}"})
+                continue
             break
         name, args = act["tool"], act.get("args") or {}
         if name not in visible or name not in box.specs:  # defence in depth: the executor enforces scope
@@ -268,7 +275,8 @@ async def answer(state: State, config) -> dict:
         text += f" The {h['system']} access request for {h['subject_employee_id']} is pending; it is not filed, approved or in effect yet."
     _meta(status=status)
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
-    return {"answer": text, "status": status, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
+    cl = checklist.build(state["evidence"])
+    return {"answer": text, "status": status, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 

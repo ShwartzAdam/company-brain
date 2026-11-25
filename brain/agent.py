@@ -49,7 +49,7 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
                            [t["tool"] for t in out["tool_log"]], out["sources"], out["plan"]["intent"],
                            request_id, out["error"],
                            extra={"tool_calls": [t for t in out["tool_log"] if not t.get("rejected")],
-                                  "evidence": out["evidence"], "handoff": out.get("handoff"),
+                                  "evidence": out["evidence"], "handoff": out.get("handoff"), "checklist": out.get("checklist"),
                                   "handoff_calls": out.get("handoff_calls") or 0})
             get_client().update_current_span(
                 input=message, output=r.answer,

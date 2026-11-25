@@ -336,3 +336,34 @@ def test_two_mayas_never_guessed(scripted, tmp_path):
                                             toolbox=box, checkpoint_path=tmp_path / "ck.db", webex_port=port)
     r = asyncio.run(go())
     assert r.extra["handoff"] is None and not port.calls
+
+
+# ---- piece 2: one bounded nudge when the planner listed more lookups than the model made ----
+def test_second_lookup_is_nudged_once_then_accepted(scripted, hits, tmp_path):
+    b = scripted(plan("subscription_review", lookups_needed=["Webex annual cost", "Q3 approval threshold"]),
+                 '{"tool":"check_software_subscription","args":{"software":"Webex"}}', '{"done":true}',
+                 '{"tool":"search_documents","args":{"query":"Q3 threshold"}}', '{"done":true}', "ok")
+    r = turn("E004", "Given the freeze, does a Webex seat need Finance?", "t-n1", tmp_path, "UG_HR")
+    assert r.tool_sequence == ["check_software_subscription", "search_documents"]
+    scripted(plan("subscription_review", lookups_needed=["a", "b", "c"]), '{"done":true}', '{"done":true}', '{"done":true}', "ok")
+    r2 = turn("E004", "x?", "t-n2", tmp_path, "UG_HR")
+    assert r2.tool_sequence == []  # nudged once, then the model's second "done" is accepted: no endless loop
+
+
+# ---- piece 4: typed checklist ----
+def test_checklist_built_by_code_cited_and_blocked_reason_names_the_seats(scripted, hits, tmp_path):
+    scripted(plan("onboarding_status"), '{"tool":"list_onboarding_tasks","args":{"employee_id":"E001"}}',
+             '{"tool":"check_software_subscription","args":{"software":"Webex"}}', '{"done":true}', "Webex is blocked.")
+    r = turn("E004", "What is on Maya's checklist?", "t-cl", tmp_path, "UG_HR")
+    cl = r.extra["checklist"]
+    by = {i["task_id"]: i for i in cl["items"]}
+    assert cl["employee_id"] == "E001" and cl["status"] == "blocked" and len(by) == 6
+    assert all(i["citations"] for i in cl["items"])
+    assert by["OT005"]["status"] == "blocked" and "42" in by["OT005"]["blocked_reason"] and "40" in by["OT005"]["blocked_reason"]
+    assert "db:software_subscriptions/SUB001" in by["OT005"]["citations"] and "db:onboarding_tasks/OT005" in by["OT005"]["citations"]
+    assert by["OT001"]["status"] == "completed" and by["OT003"]["status"] == "planned"  # never upgraded by the model
+
+
+def test_no_checklist_without_task_rows(scripted, hits, tmp_path):
+    scripted(plan("policy_question", False), "text")
+    assert turn("E004", "hello", "t-cl2", tmp_path, "UG_HR").extra["checklist"] is None
