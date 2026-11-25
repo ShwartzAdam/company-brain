@@ -21,6 +21,7 @@ class State(TypedDict, total=False):
     messages: Annotated[list, operator.add]   # whole conversation, survives restarts
     facts: list
     constraints: list
+    closed: list          # intents of topics the user closed (their raw turns and rows are dropped)
     # per turn
     message: str
     plan: dict
@@ -39,19 +40,33 @@ def _union(old, new):
     return list(dict.fromkeys([*(old or []), *(new or [])]))[-MAX_FACTS:]  # ponytail: facts/constraints only grow
 
 
+def _window(state):
+    return window(state.get("messages") or [], closed=state.get("closed") or ())
+
+
 def _meta(**kw):
     get_client().update_current_span(metadata=kw)
 
 
 @observe(name="classify")
 async def classify(state: State, config) -> dict:
-    msgs = classify_prompt(state.get("messages") or [], state["message"], state.get("facts"), state.get("constraints"))
+    msgs = classify_prompt(_window(state), state["message"], state.get("facts"), state.get("constraints"))
     try:
         plan = parse_plan(llm.structured(msgs, CLASSIFY_SYSTEM, PLAN_SCHEMA, name="classify", max_tokens=500))
     except ValueError:  # no valid plan twice: fail open for reads only
         plan = TurnPlan()
     _meta(intent=plan.intent, requires_tools=plan.requires_tools, refuse=plan.refuse)
-    return {"plan": plan.model_dump(), "facts": _union(state.get("facts"), plan.relevant_facts),
+    facts, closed = list(state.get("facts") or []), [c for c in state.get("closed") or [] if c != plan.intent]
+    if plan.closes_topic:  # the model proposes, code applies: drop the last topic's rows, keep one decision line
+        prev = next((m.get("intent") for m in reversed(state.get("messages") or []) if m["role"] == "user"), None)
+        if prev and prev != plan.intent:
+            gone = [f for f in facts if f.startswith(f"{prev}: ")]
+            ids = set(re.findall(r"\[db:\w+/(\w+)\]", " ".join(gone)))  # the dropped rows' own ids only
+            facts = [f for f in facts if f not in gone and not (ids and not f.startswith("decision:")
+                                                                   and any(i in f for i in ids))]
+            closed.append(prev)
+        facts.append(f"decision: closed - {plan.closes_topic}")
+    return {"plan": plan.model_dump(), "closed": closed, "facts": _union(facts, plan.relevant_facts),
             "constraints": _union(state.get("constraints"), plan.relevant_constraints),
             "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": []}
 
@@ -93,9 +108,9 @@ async def gather(state: State, config) -> dict:
     error = ""
     bad = 0
     for _ in range(MAX_STEPS):
-        user = (f"Caller employee id (use it for 'me'/'my'): {box.caller_id}\n"
+        user = (f"Caller employee id (use it ONLY for 'me'/'my'; any other person needs their own lookup): {box.caller_id}\n"
                 f"Constraints: {state.get('constraints')}\nFacts: {state.get('facts')}\n"
-                f"Recent conversation:\n{render(window(state.get('messages') or []))}\n\n"
+                f"Recent conversation:\n{render(_window(state))}\n\n"
                 f"Newest message:\n{state['message']}\n\nEvidence so far:\n{_evidence_text(ev)}")
         schema = {"type": "object", "properties": {"tool": {"type": "string", "enum": list(visible)},
                                                    "args": {"type": "object"}, "done": {"type": "boolean"}}}
@@ -193,16 +208,18 @@ async def answer(state: State, config) -> dict:
         text = f"I could not complete this: {state['error']}."
     else:
         body = (f"Facts: {state.get('facts')}\nConstraints: {state.get('constraints')}\n"
-                f"Recent conversation:\n{render(window(state.get('messages') or []))}\n\n"
+                f"Recent conversation:\n{render(_window(state))}\n\n"
                 f"Evidence:\n{_evidence_text(state['evidence'])}\n\nQuestion:\n{state['message']}")
         text = llm.complete([{"role": "user", "content": body}], ANSWER_SYSTEM.format(status=status), max_tokens=700)
     if not answer_agrees(status, text):
+        _meta(guard_rewrote_answer=True, original_answer=text[:400])
         text = ("I have not filed or granted anything. That would need the caller's explicit go-ahead "
                 "and the recorded approvals first.")
     _meta(status=status)
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
-    return {"answer": text, "status": status, "facts": _union(state.get("facts"), _row_facts(state["evidence"])),
-            "messages": [{"role": "user", "content": state["message"]}, {"role": "assistant", "content": text}]}
+    return {"answer": text, "status": status, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
+            "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
+                         {"role": "assistant", "content": text, "intent": plan.intent}]}
 
 
 def route_classify(state: State) -> str:

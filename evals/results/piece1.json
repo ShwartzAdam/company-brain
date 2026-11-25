@@ -1,0 +1,200 @@
+{
+ "S2-onboarding-maya": {
+  "1": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "10": {
+   "fails": [
+    "missing fact 'pending'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "pending",
+   "tools": []
+  },
+  "11": {
+   "fails": [
+    "list_onboarding_tasks.employee_id='E004', expected 'E001'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "list_onboarding_tasks"
+   ]
+  },
+  "12": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "2": {
+   "fails": [
+    "missing fact 'Salesforce'",
+    "missing fact 'Webex'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "get_employee",
+    "search_documents"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "list_onboarding_tasks"
+   ]
+  },
+  "4": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "get_employee",
+    "list_employee_tickets"
+   ]
+  },
+  "5": {
+   "fails": [
+    "missing fact 'A005|MacBook'",
+    "tool use False != True"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "list_onboarding_tasks"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "9": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  }
+ },
+ "S3-intent-shift": {
+  "1": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "fails": [
+    "missing fact 'T001'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "list_employee_tickets"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "5": {
+   "fails": [
+    "missing fact 'T004|waiting'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "pending",
+   "tools": [
+    "list_employee_tickets"
+   ]
+  },
+  "6": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "8": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "9": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  }
+ }
+}

@@ -260,3 +260,26 @@ def test_plan_schema_and_prompt_carry_the_lesson_rules():
     from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA
     assert PLAN_SCHEMA["properties"]["intent"] and "first question" in CLASSIFY_SYSTEM
     assert "quoted from the Known facts" in CLASSIFY_SYSTEM
+
+
+def test_closed_topic_rows_and_turns_leave_memory_but_a_decision_stays(scripted, hits, tmp_path):
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}',
+             "Rachel has T001 open.")
+    turn("E004", "Rachel Stein's ticket status?", "t-c1", tmp_path, "UG_HR")
+    scripted(plan("equipment_request", False, closes_topic="Rachel Stein's Webex ticket"), "ok, moving on")
+    turn("E004", "IT has that one, drop it. Back to Maya.", "t-c1", tmp_path, "UG_HR")
+    b = scripted(plan("onboarding_status", False), "answer")
+    turn("E004", "Summarise.", "t-c1", tmp_path, "UG_HR")
+    seen = b.calls[0][0][0]["content"]
+    assert "T001" not in seen and "list_employee_tickets" not in seen
+    assert "decision: closed - Rachel Stein's Webex ticket" in seen
+
+
+def test_reopened_topic_is_visible_again(scripted, hits, tmp_path):
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}', "T001 open.")
+    turn("E004", "Rachel's ticket?", "t-c2", tmp_path, "UG_HR")
+    scripted(plan("equipment_request", False, closes_topic="Rachel's ticket"), "ok")
+    turn("E004", "drop it", "t-c2", tmp_path, "UG_HR")
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E015"}}', '{"done":true}', "T004.")
+    r = turn("E004", "Does Alex have a ticket?", "t-c2", tmp_path, "UG_HR")
+    assert r.tool_sequence == ["list_employee_tickets"]
