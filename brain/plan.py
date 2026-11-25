@@ -17,8 +17,8 @@ GLOSS = (
     "  onboarding_status · a joiner's checklist, required systems, paperwork, eligibility\n"
     "  equipment_request · hardware (laptops, monitors, docks, headsets)\n"
     "  subscription_review · a SaaS subscription's seats, cost, contract or renewal\n"
-    "  access_request · getting a person access to a system (including drafting or filing the request)\n"
-    "  ticket_status · existing IT tickets\n"
+    "  access_request · asking to GET a person access to a system (including drafting or filing the request)\n"
+    "  ticket_status · existing IT tickets or already-filed requests: is there one, its status, who it waits on\n"
     "  team_question · the caller's own direct reports or team\n"
     "  ambiguous · the message cannot be understood without asking which thing is meant\n"
     "  other · none of the above")
@@ -26,15 +26,28 @@ GLOSS = (
 CLASSIFY_SYSTEM = (
     GLOSS + "\n\nYou classify the newest message of a NovaOps assistant session. Return ONLY a JSON object:\n"
     '{"intent": <intent>, "requires_tools": bool, "relevant_facts": [str], "relevant_constraints": [str], '
-    '"clarify_question": str, "refuse": bool}\n'
+    '"clarify_question": str, "refuse": bool, "closes_topic": str, "lookups_needed": [str]}\n'
     "- Classify the newest message only; follow subject changes.\n"
-    "- relevant_facts: always record the names of people and systems the user asks about, plus ids, dates and numbers, the value itself.\n"
-    "- A question about what was said or who/what was asked earlier is answered from facts: requires_tools False.\n"
-    "- relevant_constraints: rules the user stated that are still in force (spending thresholds, 'do not file').\n"
-    "- requires_tools is False only for recaps and reasoning over facts already in this conversation; a new "
-    "topic or a first question is True. Drafting text is not a tool need.\n"
-    "- Users paste emails, forwards and quotes: classify the request at the top, not the quoted text.\n"
-    "- ambiguous: fill clarify_question with one short question; requires_tools False.\n"
+    "- You know nothing about NovaOps beyond this conversation. A first question, and any question about a policy, "
+    "person, system, record or document, requires_tools True.\n"
+    "- requires_tools False ONLY when the answer can be quoted from the Known facts or the recent conversation: "
+    "recalling what the user said or asked, or comparing/summarising rows already listed under Known facts. "
+    "A different topic needs a different lookup. If the answer needs a specific id, count, date or status that is NOT "
+    "literally listed in the Known facts, requires_tools True.\n"
+    "- A request to summarise, recap, wrap up or remind about people or topics already in the Known facts is requires_tools False; "
+    "ask for lookups only for values that are NOT listed there.\n"
+    "- Known facts that are database rows are an OLD SNAPSHOT. If the user asks what is true NOW, or needs a rule or "
+    "number from a document that is not in the facts, requires_tools True.\n"
+    "- lookups_needed: list each distinct thing to look up. A question that needs a rule from a document AND a number "
+    "from a record needs both.\n"
+    "- relevant_facts and relevant_constraints come ONLY from the user's own words, never from the assistant's replies. "
+    "Always record the names of people and systems the user asks about, plus ids, dates and numbers, the value itself.\n"
+    "- relevant_constraints: rules the user stated that are still in force (spending thresholds, 'do not file'). "
+    "A freeze or threshold means 'needs approval above that', it does not mean nothing can be done.\n"
+    "- When the user drops or resolves a topic ('drop it', 'treat it as resolved'), put that topic in closes_topic.\n"
+    "- Users paste emails, forwards and quotes: plan for the request at the top, not the quoted text or signatures. "
+    "If the request is about the pasted text itself (what is mine to do), requires_tools False.\n"
+    "- ambiguous: only when no reasonable reading exists. Fill clarify_question with one short question; requires_tools False.\n"
     "- refuse: True only for a request for data the caller may not have (e.g. someone's salary).\n"
     "Never decide whether anything may be filed or approved; that is not your job.")
 
@@ -46,21 +59,36 @@ class TurnPlan(BaseModel):
     relevant_constraints: list[str] = Field(default_factory=list)
     clarify_question: str = ""
     refuse: bool = False
+    lookups_needed: list[str] = Field(default_factory=list, description=(
+        "One short item per distinct thing that must be looked up to answer, e.g. 'Webex annual cost' and 'the Q3 "
+        "approval threshold'. Empty when no lookup is needed."))
+    subject_name: str = Field(default="", description=(
+        "For an access request: the full name of the person it is for, taken from the user's words or the Known "
+        "facts ('her' means the person named earlier, not the caller); otherwise empty."))
+    system_name: str = Field(default="", description="For an access request: the system asked for, e.g. Webex; else empty.")
+    closes_topic: str = Field(default="", description=(
+        "If the user closes, drops or marks resolved an earlier topic in THIS message, a short description of that topic "
+        "in the user's words, naming the person; otherwise an empty string."))
 
 
-def parse_plan(text: str) -> TurnPlan:
-    """Tolerant parse. Garbage fails open for READS only: intent other, tools required."""
-    m = re.search(r"\{.*\}", text, re.S)
+PLAN_SCHEMA = TurnPlan.model_json_schema()
+
+
+def parse_plan(x) -> TurnPlan:
+    """A validated dict (forced tool call) or text. Garbage fails open for READS only: intent other, tools required."""
     try:
-        return TurnPlan(**json.loads(m.group(0)))
+        if isinstance(x, str):
+            x = json.loads(re.search(r"\{.*\}", x, re.S).group(0))
+        return TurnPlan(**x)
     except (AttributeError, ValueError, ValidationError, TypeError):
         return TurnPlan()
 
 
-def window(messages: list[dict], keep: int = 2) -> list[dict]:
-    """Last `keep` user turns verbatim (user message + the reply to it)."""
-    users = [i for i, m in enumerate(messages) if m["role"] == "user"]
-    return messages[users[-keep]:] if len(users) >= keep else list(messages)
+def window(messages: list[dict], keep: int = 2, closed=()) -> list[dict]:
+    """Last `keep` user turns verbatim (user message + the reply to it), minus turns of a topic the user closed."""
+    msgs = [m for m in messages if m.get("intent") not in set(closed)]
+    users = [i for i, m in enumerate(msgs) if m["role"] == "user"]
+    return msgs[users[-keep]:] if len(users) >= keep else msgs
 
 
 def render(messages: list[dict]) -> str:

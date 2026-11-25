@@ -1,0 +1,29 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t12: missing 'Finance' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)"
+ ],
+ "closed": [
+  "S2-onboarding-maya t9: closed-branch word 'Rachel' in answer",
+  "S2-onboarding-maya t10: closed-branch word 'Rachel' in answer",
+  "S3-intent-shift t8: durable fact lost or tools used (tools=['get_employee'])"
+ ],
+ "citations": [
+  "S9-maya-own-account t3: tool-backed answer cites nothing"
+ ],
+ "writes": [],
+ "handoff": [
+  "S2-onboarding-maya t10: no typed handoff (extra.handoff missing)"
+ ],
+ "restart": [],
+ "arguments": [],
+ "faithful": [
+  "S2-onboarding-maya t1: faithfulness 0.67, unsupported ['No further actions can be taken on SaaS-related onboarding items until after the freeze period.']",
+  "S2-onboarding-maya t9: faithfulness 0.00, unsupported ['adding a Webex seat for Maya Cohen would need Finance approval because the Q3 SaaS freeze applies to any new software or service costs', 'requesting an additional seat would be subject to the freeze and requires escalation to both IT and Finance']",
+  "S9-maya-own-account t3: faithfulness 0.00, unsupported ['I could not complete this: get_employee failed: 1 validation error for get_employeeArguments query Field required [type=missing, input_value={}, input_type=dict] For further information visit https://errors.pydantic.dev/2.14/v/missing.']",
+  "S9-maya-own-account t4: faithfulness 0.00, unsupported ['How do I get promoted here? What does the path look like for a CSM?', 'what here is actually mine to do', 'Okta profile is created but the baseline groups are still pending on my side']",
+  "S9-maya-own-account t5: faithfulness 0.00, unsupported ['I could not check if you are getting a laptop before the 1st because the asset inventory check returned no results for a laptop at employee E001\u2019s location']"
+ ]
+}

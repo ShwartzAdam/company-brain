@@ -1,0 +1,34 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S4-constraint-carry t8: missing 'Finance' (turn-1 threshold still flagged when the user lifts the filing rule)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)",
+  "S4-constraint-carry t9: used tools ['check_software_subscription', 'check_software_subscription'], expected none"
+ ],
+ "closed": [
+  "S2-onboarding-maya t12: closed-branch word 'T001' in answer",
+  "S3-intent-shift t9: closed-branch word 'T001' in answer",
+  "S3-intent-shift t8: durable fact lost or tools used (tools=['get_employee'])"
+ ],
+ "citations": [
+  "S9-maya-own-account t1: cites 'documents/handbook/S3, Senior Support Specialist or Customer Success Manager' which was never retrieved",
+  "S9-maya-own-account t1: cites 'documents/handbook/Promotion Process' which was never retrieved",
+  "S9-maya-own-account t1: cites 'documents/handbook/Promotion Evidence' which was never retrieved"
+ ],
+ "writes": [],
+ "handoff": [
+  "S2-onboarding-maya t10: no typed handoff (extra.handoff missing)"
+ ],
+ "restart": [],
+ "arguments": [],
+ "faithful": [
+  "S2-onboarding-maya t1: faithfulness 0.50, unsupported ['any onboarding-related software or tool purchases will be deferred until after the freeze period']",
+  "S2-onboarding-maya t6: faithfulness 0.75, unsupported ['she will not receive a headset at this time']",
+  "S2-onboarding-maya t8: faithfulness 0.00, unsupported ['There is no available Webex seat for Maya Cohen because the current Webex subscription (SUB001) is over its seat limit with 42 active seats against a limit of 40, showing -2 seats available and the subscription is over limit', 'the Q3 SaaS freeze applies, which would block new license requests']",
+  "S9-maya-own-account t1: faithfulness 0.75, unsupported ['The promotion process runs twice per year, with proposals due in March and September']",
+  "S9-maya-own-account t2: faithfulness 0.00, unsupported ['What does the path look like for a CSM', 'what here is actually mine to do']",
+  "S9-maya-own-account t3: faithfulness 0.00, unsupported ['You need to sign the equipment responsibility form and finish your BambooHR self-service profile once the invite lands, as these are the only two tasks assigned to you', 'The Okta profile is created, but baseline groups are pending with Amir Haddad', 'Webex is over its seat limit, which is an IT issue']",
+  "S9-maya-own-account t4: faithfulness 0.00, unsupported [\"What does the manager's guide say about giving feedback in someone's first 90 days?\"]"
+ ]
+}

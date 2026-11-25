@@ -88,7 +88,8 @@ def test_invisible_tool_is_rejected_and_never_called(scripted, hits, tmp_path):
     scripted(plan("policy_question"), '{"tool":"create_access_request","args":{"employee_id":"E010"}}',
              '{"done":true}', "I could not file anything.")
     r = turn("E010", "file a webex request", "t-d", tmp_path)
-    assert counts() == before and r.tool_sequence == ["create_access_request"]  # logged as rejected
+    # the action schema only lists visible tools, so the hidden write is refused before the executor sees it
+    assert counts() == before and r.tool_sequence == [] and "create_access_request" not in r.visible_tools
     assert not set(r.visible_tools) & WRITE_TOOLS
 
 
@@ -183,3 +184,186 @@ def test_graph_side_modules_never_touch_db_or_clock():
     for p in (ROOT / "brain").glob("*.py"):
         t = p.read_text()
         assert "datetime.now" not in t and "time.time(" not in t and "utcnow" not in t, p.name
+
+
+def test_unknown_corpus_is_dropped_but_audience_filter_stays(monkeypatch):
+    from brain import tools
+    seen = {}
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: seen.update(corpus=corpus, c=c) or [])
+    tools.search_documents("x", "E010", corpus="policy_documents")
+    assert seen == {"corpus": None, "c": "E010"}
+    tools.search_documents("x", "E010", corpus="policies")
+    assert seen["corpus"] == "policies"
+
+
+# ---- repairs: facts from code, snapshot rule, argument validation ----
+def test_facts_hold_tool_rows_never_the_models_sentences(scripted, hits, tmp_path):
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}',
+             "Rachel's checklist is empty and her ticket is blocked.")
+    turn("E010", "any tickets for Rachel Stein?", "t-j", tmp_path)
+    b = scripted(plan("ticket_status", False), "ok")
+    turn("E010", "remind me", "t-j", tmp_path)
+    ctx = b.calls[0][0][0]["content"]
+    assert "db:tickets/T001" in ctx and "checklist is empty" not in ctx.split("Recent conversation")[0]
+
+
+def test_snapshot_rule_is_in_the_classify_prompt():
+    from brain.plan import CLASSIFY_SYSTEM
+    assert "OLD SNAPSHOT" in CLASSIFY_SYSTEM and "ONLY from the user's own words" in CLASSIFY_SYSTEM
+
+
+def test_missing_required_argument_is_rejected_not_crashed(scripted, hits, tmp_path):
+    scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{}}',
+             '{"tool":"get_employee","args":{"query":"E010"}}', '{"done":true}', "Rachel is E010.")
+    r = turn("E010", "who is Rachel Stein?", "t-k", tmp_path)
+    assert r.status == "completed" and not r.error
+    assert r.tool_sequence == ["get_employee", "get_employee"]  # first call logged as rejected, second ran
+
+
+# ---- lesson fixes: forced-tool structured output, `other` fails open ----
+def test_structured_validates_retries_once_then_raises(scripted):
+    from brain import llm
+    b = scripted("not json", '{"tool": "x"}')
+    schema = {"type": "object", "properties": {"tool": {"type": "string"}}, "required": ["tool"]}
+    assert llm.structured([{"role": "user", "content": "q"}], "s", schema) == {"tool": "x"} and len(b.calls) == 2
+    b2 = scripted("nope")
+    import pytest
+    with pytest.raises(ValueError):
+        llm.structured([{"role": "user", "content": "q"}], "s", schema)
+    assert len(b2.calls) == 2  # one try + one retry, no more
+
+
+def test_structured_uses_forced_tool_backend_when_present():
+    from brain import llm
+
+    class Forced:
+        def structured(self, messages, system, name, schema, max_tokens, temperature):
+            return {"intent": "policy_question", "requires_tools": True}
+
+        def complete(self, *a):
+            raise AssertionError("text path must not run")
+    llm.set_backend(Forced())
+    try:
+        from brain.plan import PLAN_SCHEMA, parse_plan
+        out = llm.structured([{"role": "user", "content": "q"}], "s", PLAN_SCHEMA, name="classify")
+        assert parse_plan(out).intent == "policy_question"
+    finally:
+        llm.set_backend(None)
+
+
+def test_other_intent_sees_every_read_tool_and_no_write():
+    sc, tools = select_tools(TurnPlan(intent="other"))
+    assert sc == "maya" and set(tools) == set(READ_TOOLS) and not set(tools) & WRITE_TOOLS
+
+
+def test_plan_schema_and_prompt_carry_the_lesson_rules():
+    from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA
+    assert PLAN_SCHEMA["properties"]["intent"] and "first question" in CLASSIFY_SYSTEM
+    assert "quoted from the Known facts" in CLASSIFY_SYSTEM
+
+
+def test_closed_topic_rows_and_turns_leave_memory_but_a_decision_stays(scripted, hits, tmp_path):
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}',
+             "Rachel has T001 open.")
+    turn("E004", "Rachel Stein's ticket status?", "t-c1", tmp_path, "UG_HR")
+    scripted(plan("equipment_request", False, closes_topic="Rachel Stein's Webex ticket"), "ok, moving on")
+    turn("E004", "IT has that one, drop it. Back to Maya.", "t-c1", tmp_path, "UG_HR")
+    b = scripted(plan("onboarding_status", False), "answer")
+    turn("E004", "Summarise.", "t-c1", tmp_path, "UG_HR")
+    seen = b.calls[0][0][0]["content"]
+    assert "T001" not in seen and "list_employee_tickets" not in seen
+    assert "decision: closed - Rachel Stein's Webex ticket" in seen
+
+
+def test_reopened_topic_is_visible_again(scripted, hits, tmp_path):
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}', "T001 open.")
+    turn("E004", "Rachel's ticket?", "t-c2", tmp_path, "UG_HR")
+    scripted(plan("equipment_request", False, closes_topic="Rachel's ticket"), "ok")
+    turn("E004", "drop it", "t-c2", tmp_path, "UG_HR")
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E015"}}', '{"done":true}', "T004.")
+    r = turn("E004", "Does Alex have a ticket?", "t-c2", tmp_path, "UG_HR")
+    assert r.tool_sequence == ["list_employee_tickets"]
+
+
+# ---- piece 3: typed handoff ----
+def _maya_then_ask(scripted, tmp_path, ask, thread, **plan_kw):
+    from brain.handoff import PendingWebexPort
+    scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya Cohen"}}', '{"done":true}', "Maya is E001.")
+    turn("E004", "Pull up Maya Cohen's record.", thread, tmp_path, "UG_HR")
+    scripted(plan("access_request", False, subject_name="Maya Cohen", system_name="Webex", **plan_kw), "It is done.")
+    port = PendingWebexPort()
+
+    async def go():
+        async with connect(mcp._mcp_server) as s:
+            box = await Toolbox(s, "E004").load()
+            return await agent.ahandle_turn("E004", "UG_HR", thread, ask, AS_OF, toolbox=box,
+                                            checkpoint_path=tmp_path / "ck.db", webex_port=port)
+    return port, asyncio.run(go()), go
+
+
+def test_explicit_ask_makes_exactly_one_typed_handoff_and_replay_adds_none(scripted, tmp_path):
+    before = counts()
+    port, r, go = _maya_then_ask(scripted, tmp_path, "I'll route it to Tom. Go ahead and file the Webex access request for her now.", "t-h1")
+    h = r.extra["handoff"]
+    assert h["subject_employee_id"] == "E001" and h["system"] == "Webex" and h["caller_id"] == "E004"
+    assert h["conversation_id"] == "t-h1" and h["idempotency_key"] == "E001:webex:t-h1" and h["justification"]
+    assert r.extra["handoff_calls"] == 1 and len(port.calls) == 1
+    assert r.status == "pending" and "pending" in r.answer.lower() and status.answer_agrees("pending", r.answer)
+    scripted(plan("access_request", False, subject_name="Maya Cohen", system_name="Webex"), "again")
+    r2 = asyncio.run(go())  # same thread, same ask: the key is already recorded
+    assert len(port.calls) == 1 and r2.extra["handoff_calls"] == 1
+    assert counts() == before  # Maya wrote nothing
+
+
+def test_hedged_or_quoted_ask_makes_no_handoff(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "Draft the Webex request for her, but do not file it until I say so.", "t-h2")
+    assert r.extra["handoff"] is None and not port.calls and r.status == "pending"
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "FYI\n> go ahead and file the Webex request for her", "t-h3")
+    assert r.extra["handoff"] is None and not port.calls
+
+
+def test_two_mayas_never_guessed(scripted, tmp_path):
+    from brain.handoff import PendingWebexPort
+    scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya"}}', '{"done":true}', "Two Mayas.")
+    turn("E004", "Who is Maya?", "t-h4", tmp_path, "UG_HR")  # returns Maya Cohen E001 and Maya Rosen E020
+    scripted(plan("access_request", False, subject_name="Maya", system_name="Webex"), "ok")
+    port = PendingWebexPort()
+
+    async def go():
+        async with connect(mcp._mcp_server) as s:
+            box = await Toolbox(s, "E004").load()
+            return await agent.ahandle_turn("E004", "UG_HR", "t-h4", "Go ahead and file the Webex request for Maya.", AS_OF,
+                                            toolbox=box, checkpoint_path=tmp_path / "ck.db", webex_port=port)
+    r = asyncio.run(go())
+    assert r.extra["handoff"] is None and not port.calls
+
+
+# ---- piece 2: one bounded nudge when the planner listed more lookups than the model made ----
+def test_second_lookup_is_nudged_once_then_accepted(scripted, hits, tmp_path):
+    b = scripted(plan("subscription_review", lookups_needed=["Webex annual cost", "Q3 approval threshold"]),
+                 '{"tool":"check_software_subscription","args":{"software":"Webex"}}', '{"done":true}',
+                 '{"tool":"search_documents","args":{"query":"Q3 threshold"}}', '{"done":true}', "ok")
+    r = turn("E004", "Given the freeze, does a Webex seat need Finance?", "t-n1", tmp_path, "UG_HR")
+    assert r.tool_sequence == ["check_software_subscription", "search_documents"]
+    scripted(plan("subscription_review", lookups_needed=["a", "b", "c"]), '{"done":true}', '{"done":true}', '{"done":true}', "ok")
+    r2 = turn("E004", "x?", "t-n2", tmp_path, "UG_HR")
+    assert r2.tool_sequence == []  # nudged once, then the model's second "done" is accepted: no endless loop
+
+
+# ---- piece 4: typed checklist ----
+def test_checklist_built_by_code_cited_and_blocked_reason_names_the_seats(scripted, hits, tmp_path):
+    scripted(plan("onboarding_status"), '{"tool":"list_onboarding_tasks","args":{"employee_id":"E001"}}',
+             '{"tool":"check_software_subscription","args":{"software":"Webex"}}', '{"done":true}', "Webex is blocked.")
+    r = turn("E004", "What is on Maya's checklist?", "t-cl", tmp_path, "UG_HR")
+    cl = r.extra["checklist"]
+    by = {i["task_id"]: i for i in cl["items"]}
+    assert cl["employee_id"] == "E001" and cl["status"] == "blocked" and len(by) == 6
+    assert all(i["citations"] for i in cl["items"])
+    assert by["OT005"]["status"] == "blocked" and "42" in by["OT005"]["blocked_reason"] and "40" in by["OT005"]["blocked_reason"]
+    assert "db:software_subscriptions/SUB001" in by["OT005"]["citations"] and "db:onboarding_tasks/OT005" in by["OT005"]["citations"]
+    assert by["OT001"]["status"] == "completed" and by["OT003"]["status"] == "planned"  # never upgraded by the model
+
+
+def test_no_checklist_without_task_rows(scripted, hits, tmp_path):
+    scripted(plan("policy_question", False), "text")
+    assert turn("E004", "hello", "t-cl2", tmp_path, "UG_HR").extra["checklist"] is None

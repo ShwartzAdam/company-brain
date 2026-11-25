@@ -30,6 +30,12 @@ class Toolbox:
                        f"{(t.description or '').strip().splitlines()[0] if t.description else ''}")
         return "\n".join(out)
 
+    def missing_args(self, name: str, args: dict) -> list[str]:
+        """Required arguments the application does not inject itself and the model left out."""
+        sch = self.specs[name].inputSchema
+        auto = {"caller_id", "as_of", "conversation_id"}
+        return [k for k in sch.get("required") or [] if k not in auto and (args or {}).get(k) in (None, "")]
+
     async def call(self, name: str, args: dict):
         args = dict(args or {})
         if "caller_id" in (self.specs[name].inputSchema.get("properties") or {}):

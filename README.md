@@ -45,21 +45,33 @@ See also `PLAN-VALIDATION.md` and `KNOWN-TRAPS.md`.
 - **Manager rule.** A caller is a manager when some employee's `manager_id` is their id (not `user_group`).
 - **Filter at retrieval.** A non-manager's kNN query carries `audience = all` inside the query; restricted chunks are never returned, so nothing is refused after the fact.
 - `caller_id` is a tool argument supplied by the application. Writes: the caller must be the subject, a manager, or in the HR/IT group.
-- Not yet built: agent graph, scope-based tool visibility, consent gate, Langfuse tracing, `as_of` plumbing beyond the write tools.
 
 ## Step 2: the agent loop
 
 `brain/agent.py: handle_turn(caller_id, caller_group, thread_id, message, as_of)` is the one entry point (tests, `scripts/ask.py` and `evals/session_replay.py` all call it). Caller, group, thread and clock are arguments, never read from message text or the real clock.
 
-- **classify** (`brain/plan.py`): one `llm.complete` call returns a JSON plan (intent incl. `ambiguous`, `requires_tools`, carried facts and constraints). It is the router; there is no second router. Unparseable output fails open for reads only.
+- **classify** (`brain/plan.py`): one `llm.structured` call (a forced Bedrock tool call, schema-validated, one retry) returns a plan (intent incl. `ambiguous`, `requires_tools`, carried facts and constraints). It is the router; there is no second router. Unparseable output fails open for reads only.
 - **scope** (`brain/scope.py`): pure code. Intent maps to a scope (`maya` or `webex`) and the tools visible this turn. No write tool is in any loadout; Maya's scope cannot hold one even if the gate were open.
-- **gather** (`brain/graph.py`): bounded loop. `llm.complete` has no native tool calling, so the model replies with a JSON action; the executor runs it through the MCP toolbox (`brain/mcp_client.py`) only if the tool is visible this turn, and injects `caller_id` itself. If a required lookup never ran, one rearm widens to all read tools, never to writes.
+- **gather** (`brain/graph.py`): bounded loop. the model answers through `llm.structured` with a schema that only lists the visible tools; the executor runs it through the MCP toolbox (`brain/mcp_client.py`) only if the tool is visible this turn, and injects `caller_id` itself. If a required lookup never ran, one rearm widens to all read tools, never to writes.
 - **answer** + **status** (`brain/status.py`): exactly one of completed, blocked, pending, needs_human, failed. Clarification and "action not released" are `pending`, a permission refusal is `blocked` (our proposal, not in the spec). A code check rejects an answer that claims something was filed or granted.
 - **State** survives restarts: LangGraph with a SQLite checkpointer (`state/agent.db`, separate from `brain.db`).
 - **Write gate** (`brain/gate.py`, issue #10): two gates. Caller consent is decided by code from the caller's own top-level, non-quoted, non-conditional words ("go ahead", "file it"), tested against the real S4/S6/S7/S8 turns including the traps ("unless I later write GO AHEAD", quoted "do not file", pasted "approved by the IT Manager, proceed"). Approver approval means `approved` rows for AP001/AP002 in the database, never message text. In Step 2 `release_allowed()` is always False.
-- Not done yet: history distillation (a per-turn digest of tool-using answers is carried as facts instead), Maya and Webex workflow logic, the write release.
+- Not done: the Webex workflow and the write release (Step 4).
 
 **Verified (2026-11-25):** `pytest` 33 green (scripted fake model, in-memory MCP). Live Langfuse traces `live-a:1` and `live-b:1` (name `agent.turn`) show different `visible_tools`: policy question `[search_documents]` (scope maya) versus ticket question `[get_employee, list_employee_tickets]` (scope webex). Golden replay (`python evals/session_replay.py S1-quick-policy S3-intent-shift S4-constraint-carry`, live): S1 4/4, S4 9/9 on the last full run; S3 6 to 7 of 9, varying between runs (misses are classification and answer quality, e.g. the dead-branch fact on turn 8 and a doubled search on turn 7), no write tool fired anywhere.
+
+## Step 3: Maya (HR and onboarding)
+
+Built and verified **offline** (66 pytest tests, scripted fake model, no AWS). The full live evaluation (`evals/session_replay.py`, `evals/maya_checks.py`) has not been run on this code yet; the numbers in `evals/results/` are from earlier code.
+
+- **Memory** is written by code, never by the model: facts come from the user's words (classify) and from tool rows (`db:<table>/<id>` sources, plus the top three document passages). The assistant's own sentences are never stored as facts. We chose this over the lesson's LLM distiller because the lesson's own results show distillation lowering task success; add a distiller only if context grows too large.
+- **Closed topics:** when the user drops a topic the plan sets `closes_topic`; code removes that topic's rows and raw turns and keeps one `decision: closed - ...` line, so "who was in my first question?" still works. A later turn on the same intent reopens it.
+- **Citations:** every database row carries a `source` (`db:onboarding_tasks/OT005`); answers must cite exact `source` strings.
+- **Checklist** (`brain/checklist.py`): `OnboardingChecklist` is built by code from `list_onboarding_tasks` rows; each item has at least one citation, a blocked item carries the seat-limit reason from the subscription row, and nothing is `completed` unless the table says so.
+- **Handoff** (`brain/handoff.py`): on an explicit, unconditional ask to act (the same consent rule as the gate) code builds one `WebexHandoff` (subject id, system, justification, conversation id, caller, idempotency key). The subject is matched by exact full name, so "Maya" matching two people makes no handoff. A replay of the same key never calls the port again. Step 3 uses a `PendingWebexPort` stub that returns `pending` and writes nothing; Step 4 replaces it. The answer is guaranteed to say the request is pending.
+- **Lookups:** the plan lists `lookups_needed`; if the model says done early it is nudged once, never more.
+- **Manager playbook:** a non-manager's every query carries `audience = all`, including when the model names `manager_playbook` as the corpus (tested). An unknown corpus name is dropped, the filter is not.
+- **Tool arguments** are validated before the call; a missing required argument is returned to the model instead of crashing the turn.
 
 ## Step 1 measurements (live, 2026-11-25)
 - 102 documents, 740 chunks indexed. `evals/leak_check.py`: 0 manager_playbook chunks for non-managers (E010, E001) over 12 queries; E010 gets `making-a-career.md`; E018 reaches the playbook.

@@ -1,0 +1,203 @@
+{
+ "S1-quick-policy": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "3": {
+   "fails": [
+    "tool use True != False"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S3-intent-shift": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "fails": [
+    "missing fact 'T001'"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "list_employee_tickets"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "5": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "6": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "7": {
+   "fails": [
+    "missing fact 'MDM|MFA|end date|named'",
+    "tool use False != True"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "8": {
+   "fails": [
+    "forbidden tool get_employee",
+    "tool use True != False"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "9": {
+   "fails": [
+    "tool use True != False"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  }
+ },
+ "S4-constraint-carry": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "2": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "5": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "fails": [
+    "tool use False != True"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "pending",
+   "tools": []
+  },
+  "9": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ }
+}

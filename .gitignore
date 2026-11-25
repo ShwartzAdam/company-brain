@@ -12,3 +12,4 @@ results/
 data/
 *.db-shm
 *.db-wal
+!evals/results/

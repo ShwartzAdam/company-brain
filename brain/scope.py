@@ -14,7 +14,7 @@ LOADOUTS: dict[str, tuple[str, list[str]]] = {
     "onboarding_status": ("maya", ["get_employee", "list_onboarding_tasks", "search_documents",
                                    "check_asset_inventory", "check_software_subscription", "get_contract"]),
     "equipment_request": ("maya", ["get_employee", "check_asset_inventory", "search_documents"]),
-    "other": ("maya", ["search_documents", "get_employee"]),
+    "other": ("maya", READ_TOOLS),  # relevance fails open (lesson 10): an unrecognised turn sees every read tool
     "subscription_review": ("webex", ["check_software_subscription", "get_contract", "search_documents"]),
     "access_request": ("webex", ["get_employee", "check_software_subscription", "list_employee_tickets",
                                  "read_approval", "search_documents"]),

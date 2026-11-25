@@ -1,0 +1,191 @@
+{
+ "S2-onboarding-maya": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "10": {
+   "fails": [
+    "missing fact 'pending'",
+    "tool use True != False"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "11": {
+   "fails": [
+    "tool use False != True"
+   ],
+   "passes": 1,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "12": {
+   "fails": [
+    "missing fact '2026-08-01|August 1|Aug 1|1 August'"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "2": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee",
+    "search_documents"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "list_onboarding_tasks"
+   ]
+  },
+  "4": {
+   "fails": [
+    "missing fact 'T001|open'",
+    "tool use False != True"
+   ],
+   "passes": 1,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee",
+    "search_documents"
+   ]
+  },
+  "5": {
+   "fails": [
+    "missing fact 'A005|MacBook'",
+    "tool use False != True"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_asset_inventory"
+   ]
+  },
+  "6": {
+   "fails": [
+    "tool use False != True"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_asset_inventory",
+    "check_asset_inventory"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "fails": [
+    "tool use False != True"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "9": {
+   "fails": [
+    "missing fact '7,500|7500'",
+    "tool use False != True"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S9-maya-own-account": {
+  "1": {
+   "fails": [
+    "expected source missing making-a-career.md",
+    "expected source missing titles-for-support.md",
+    "missing fact 'April 1|October 1'",
+    "missing fact 'six months|6 months'",
+    "tool use False != True"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "fails": [
+    "forbidden fact 'Datadog'",
+    "missing fact 'BambooHR'",
+    "missing fact 'equipment responsibility|equipment form'"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "pending",
+   "tools": []
+  },
+  "3": {
+   "fails": [
+    "missing fact 'Webex'",
+    "missing fact 'blocked|seat limit|40'"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "failed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents",
+    "search_documents",
+    "list_onboarding_tasks",
+    "search_documents"
+   ]
+  },
+  "5": {
+   "fails": [
+    "missing fact '2026-07-26|July 26|planned'"
+   ],
+   "passes": 1,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_asset_inventory",
+    "get_employee"
+   ]
+  }
+ }
+}

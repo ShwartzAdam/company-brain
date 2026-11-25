@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from langfuse import get_client, observe, propagate_attributes
 
 from brain import config, graph, mcp_client
+from brain.handoff import PendingWebexPort
 from brain.scope import WRITE_TOOLS
 
 
@@ -27,7 +28,7 @@ CHECKPOINT_DB = config.ROOT / "state" / "agent.db"
 
 
 async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, message: str, as_of: str,
-                       toolbox=None, checkpoint_path=None) -> TurnResult:
+                       toolbox=None, checkpoint_path=None, webex_port=None) -> TurnResult:
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
     path = checkpoint_path or CHECKPOINT_DB
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -36,7 +37,7 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
         cfg = {"configurable": {"thread_id": thread_id}}
         n = len((await g.aget_state(cfg)).values.get("messages") or []) // 2 + 1
         request_id = f"{thread_id}:{n}"
-        cfg["configurable"].update(request_id=request_id, as_of=as_of)
+        cfg["configurable"].update(request_id=request_id, as_of=as_of, webex_port=webex_port or PendingWebexPort())
 
         @observe(name="agent.turn")
         async def run(box):
@@ -46,7 +47,10 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
                 out = await g.ainvoke({"message": message}, cfg)
             r = TurnResult(out["answer"], out["status"], out["scope"], out["visible"],
                            [t["tool"] for t in out["tool_log"]], out["sources"], out["plan"]["intent"],
-                           request_id, out["error"])
+                           request_id, out["error"],
+                           extra={"tool_calls": [t for t in out["tool_log"] if not t.get("rejected")],
+                                  "evidence": out["evidence"], "handoff": out.get("handoff"), "checklist": out.get("checklist"),
+                                  "handoff_calls": out.get("handoff_calls") or 0})
             get_client().update_current_span(
                 input=message, output=r.answer,
                 metadata={"caller_id": caller_id, "caller_group": caller_group, "scope": r.scope,
