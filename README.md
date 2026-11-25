@@ -36,6 +36,9 @@ python evals/retrieval_check.py && python evals/leak_check.py
 pytest
 ```
 
+## Tracing (Langfuse)
+`llm.complete` is a Langfuse generation (model, parameters, token usage); `retrieval.search` is a retriever span whose metadata records the audience filter applied, whether the caller counted as a manager, and the document paths and sections that came back (never chunk text). The rerank call nests under the search. The MCP server runs in its own process, so its retrieval traces are separate from the client's `ask.answer` trace until Step 2 passes a trace id. Tests set `LANGFUSE_TRACING_ENABLED=false`.
+
 ## Decisions
 See also `PLAN-VALIDATION.md` and `KNOWN-TRAPS.md`.
 - **Audience rule.** Only `handbook` (`all`) and `manager_playbook` (`manager`) carry `audience`. A document with none is stored as `all` (unrestricted). Ingest fails on any other value, or on a playbook file not marked `manager`.

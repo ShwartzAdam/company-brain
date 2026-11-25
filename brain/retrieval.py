@@ -4,6 +4,8 @@ for a caller who may not see it (reranking only ever sees already-filtered chunk
 import json
 import re
 
+from langfuse import get_client, observe
+
 from brain import config, llm, people
 
 SRC = ["text", "source", "corpus", "audience", "title", "section"]
@@ -65,6 +67,7 @@ def rerank(query: str, hits: list[dict], n: int) -> list[dict]:
     return [hits[i] for i in picked[:n]]
 
 
+@observe(as_type="retriever", name="retrieval.search", capture_input=False, capture_output=False)
 def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os_client=None,
            mode: str = "rerank") -> list[dict]:
     """mode: vector | hybrid | rerank."""
@@ -78,4 +81,11 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
     else:
         fused = rrf([vec, q(build_keyword_body(query, caller_id, POOL, corpus))])
         hits = fused[:k] if mode == "hybrid" else rerank(query, fused[:POOL], k)
-    return [{**h["_source"], "score": round(h.get("_score") or 0, 4)} for h in hits]
+    res = [{**h["_source"], "score": round(h.get("_score") or 0, 4)} for h in hits]
+    # Metadata shows what was filtered and which documents reached the model: paths, never text.
+    get_client().update_current_span(
+        input={"query": query, "caller_id": caller_id, "mode": mode, "k": k, "corpus": corpus},
+        output=[{"source": r["source"], "section": r["section"], "audience": r["audience"]} for r in res],
+        metadata={"audience_filter": _filters(caller_id, corpus), "caller_is_manager": not audience_filter(caller_id),
+                  "pool": POOL, "sources_returned": sorted({r["source"] for r in res})})
+    return res

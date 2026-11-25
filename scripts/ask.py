@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from mcp import ClientSession  # noqa: E402
 from mcp.client.streamable_http import streamablehttp_client  # noqa: E402
 
+from langfuse import observe  # noqa: E402
+
 from brain import config, llm  # noqa: E402
 
 SYSTEM = ("You are the NovaOps assistant. Answer ONLY from the numbered context. Cite sources as "
@@ -24,6 +26,7 @@ async def retrieve(question: str, caller: str) -> list[dict]:
             return [json.loads(c.text) for c in res.content]
 
 
+@observe(name="ask.answer")
 def answer(question: str, hits: list[dict]) -> str:
     ctx = "\n\n".join(f"[{i}] {h['source']}\n{h['text']}" for i, h in enumerate(hits, 1))
     return llm.complete([{"role": "user", "content": f"Context:\n{ctx}\n\nQuestion: {question}"}], SYSTEM)

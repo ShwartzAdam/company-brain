@@ -1,6 +1,8 @@
 """The only module that talks to Bedrock. A provider swap touches this file."""
 import json
 
+from langfuse import get_client, observe
+
 from brain import config
 
 _backend = None  # tests install a fake via set_backend()
@@ -18,6 +20,8 @@ class BedrockBackend:
             messages=[{"role": m["role"], "content": [{"text": m["content"]}]} for m in messages],
             inferenceConfig={"maxTokens": max_tokens, "temperature": temperature},
         )
+        u = r.get("usage", {})
+        self.last_usage = {"input": u.get("inputTokens", 0), "output": u.get("outputTokens", 0)}
         return r["output"]["message"]["content"][0]["text"]
 
     def embed(self, text):
@@ -40,9 +44,17 @@ def _get():
     return _backend
 
 
+@observe(as_type="generation", name="llm.complete", capture_input=False, capture_output=False)
 def complete(messages: list[dict], system: str = "", max_tokens: int = 1000, temperature: float = 0.2) -> str:
-    """messages: [{"role": "user"|"assistant", "content": str}]"""
-    return _get().complete(messages, system, max_tokens, temperature)
+    """messages: [{"role": "user"|"assistant", "content": str}]. Traced as a Langfuse generation."""
+    b = _get()
+    out = b.complete(messages, system, max_tokens, temperature)
+    usage = getattr(b, "last_usage", None)
+    get_client().update_current_generation(
+        input=[{"role": "system", "content": system}] + messages, output=out, model=config.MODEL_ID,
+        model_parameters={"max_tokens": max_tokens, "temperature": temperature},
+        usage_details=usage)
+    return out
 
 
 def embed(text: str) -> list[float]:
