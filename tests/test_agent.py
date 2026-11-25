@@ -183,3 +183,13 @@ def test_graph_side_modules_never_touch_db_or_clock():
     for p in (ROOT / "brain").glob("*.py"):
         t = p.read_text()
         assert "datetime.now" not in t and "time.time(" not in t and "utcnow" not in t, p.name
+
+
+def test_unknown_corpus_is_dropped_but_audience_filter_stays(monkeypatch):
+    from brain import tools
+    seen = {}
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: seen.update(corpus=corpus, c=c) or [])
+    tools.search_documents("x", "E010", corpus="policy_documents")
+    assert seen == {"corpus": None, "c": "E010"}
+    tools.search_documents("x", "E010", corpus="policies")
+    assert seen["corpus"] == "policies"

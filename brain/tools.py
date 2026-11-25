@@ -4,7 +4,14 @@ from brain import db, people, retrieval
 
 # ---------- reads ----------
 
+CORPORA = ("contracts", "employment", "handbook", "internal_memos", "it_kb", "manager_playbook", "policies")
+
+
 def search_documents(query: str, caller_id: str, corpus: str | None = None, k: int = 5) -> list[dict]:
+    """Search company documents. corpus is optional; leave it empty unless sure. Valid: contracts, employment,
+    handbook, internal_memos, it_kb, manager_playbook, policies."""
+    if corpus not in CORPORA:  # a made-up corpus name must not silently return nothing; the audience filter still applies
+        corpus = None
     return retrieval.search(query, caller_id, k=k, corpus=corpus)
 
 

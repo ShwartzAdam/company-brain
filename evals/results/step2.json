@@ -1,0 +1,205 @@
+{
+ "S1-quick-policy": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "3": {
+   "fails": [
+    "missing fact 'IT'"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S3-intent-shift": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "check_software_subscription"
+   ]
+  },
+  "2": {
+   "fails": [
+    "missing fact 'T001'"
+   ],
+   "passes": 1,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "list_employee_tickets"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "fails": [
+    "missing fact 'E015'"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "5": {
+   "fails": [
+    "missing fact 'T004|waiting'"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "list_employee_tickets"
+   ]
+  },
+  "6": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "8": {
+   "fails": [
+    "forbidden tool get_employee",
+    "tool use True != False"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "9": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S4-constraint-carry": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "2": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "5": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "fails": [
+    "missing fact '33,000|33000'"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "failed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "fails": [
+    "missing fact 'AR0|pending|filed'"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "list_employee_tickets",
+    "read_approval"
+   ]
+  },
+  "9": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ }
+}
