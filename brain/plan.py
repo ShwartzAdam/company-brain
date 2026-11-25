@@ -57,6 +57,10 @@ class TurnPlan(BaseModel):
     relevant_constraints: list[str] = Field(default_factory=list)
     clarify_question: str = ""
     refuse: bool = False
+    subject_name: str = Field(default="", description=(
+        "For an access request: the full name of the person it is for, taken from the user's words or the Known "
+        "facts ('her' means the person named earlier, not the caller); otherwise empty."))
+    system_name: str = Field(default="", description="For an access request: the system asked for, e.g. Webex; else empty.")
     closes_topic: str = Field(default="", description=(
         "If the user closes, drops or marks resolved an earlier topic in THIS message, a short description of that topic "
         "in the user's words, naming the person; otherwise an empty string."))

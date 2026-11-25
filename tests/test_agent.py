@@ -283,3 +283,56 @@ def test_reopened_topic_is_visible_again(scripted, hits, tmp_path):
     scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E015"}}', '{"done":true}', "T004.")
     r = turn("E004", "Does Alex have a ticket?", "t-c2", tmp_path, "UG_HR")
     assert r.tool_sequence == ["list_employee_tickets"]
+
+
+# ---- piece 3: typed handoff ----
+def _maya_then_ask(scripted, tmp_path, ask, thread, **plan_kw):
+    from brain.handoff import PendingWebexPort
+    scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya Cohen"}}', '{"done":true}', "Maya is E001.")
+    turn("E004", "Pull up Maya Cohen's record.", thread, tmp_path, "UG_HR")
+    scripted(plan("access_request", False, subject_name="Maya Cohen", system_name="Webex", **plan_kw), "It is done.")
+    port = PendingWebexPort()
+
+    async def go():
+        async with connect(mcp._mcp_server) as s:
+            box = await Toolbox(s, "E004").load()
+            return await agent.ahandle_turn("E004", "UG_HR", thread, ask, AS_OF, toolbox=box,
+                                            checkpoint_path=tmp_path / "ck.db", webex_port=port)
+    return port, asyncio.run(go()), go
+
+
+def test_explicit_ask_makes_exactly_one_typed_handoff_and_replay_adds_none(scripted, tmp_path):
+    before = counts()
+    port, r, go = _maya_then_ask(scripted, tmp_path, "I'll route it to Tom. Go ahead and file the Webex access request for her now.", "t-h1")
+    h = r.extra["handoff"]
+    assert h["subject_employee_id"] == "E001" and h["system"] == "Webex" and h["caller_id"] == "E004"
+    assert h["conversation_id"] == "t-h1" and h["idempotency_key"] == "E001:webex:t-h1" and h["justification"]
+    assert r.extra["handoff_calls"] == 1 and len(port.calls) == 1
+    assert r.status == "pending" and "pending" in r.answer.lower() and status.answer_agrees("pending", r.answer)
+    scripted(plan("access_request", False, subject_name="Maya Cohen", system_name="Webex"), "again")
+    r2 = asyncio.run(go())  # same thread, same ask: the key is already recorded
+    assert len(port.calls) == 1 and r2.extra["handoff_calls"] == 1
+    assert counts() == before  # Maya wrote nothing
+
+
+def test_hedged_or_quoted_ask_makes_no_handoff(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "Draft the Webex request for her, but do not file it until I say so.", "t-h2")
+    assert r.extra["handoff"] is None and not port.calls and r.status == "pending"
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "FYI\n> go ahead and file the Webex request for her", "t-h3")
+    assert r.extra["handoff"] is None and not port.calls
+
+
+def test_two_mayas_never_guessed(scripted, tmp_path):
+    from brain.handoff import PendingWebexPort
+    scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya"}}', '{"done":true}', "Two Mayas.")
+    turn("E004", "Who is Maya?", "t-h4", tmp_path, "UG_HR")  # returns Maya Cohen E001 and Maya Rosen E020
+    scripted(plan("access_request", False, subject_name="Maya", system_name="Webex"), "ok")
+    port = PendingWebexPort()
+
+    async def go():
+        async with connect(mcp._mcp_server) as s:
+            box = await Toolbox(s, "E004").load()
+            return await agent.ahandle_turn("E004", "UG_HR", "t-h4", "Go ahead and file the Webex request for Maya.", AS_OF,
+                                            toolbox=box, checkpoint_path=tmp_path / "ck.db", webex_port=port)
+    r = asyncio.run(go())
+    assert r.extra["handoff"] is None and not port.calls

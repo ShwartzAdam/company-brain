@@ -8,7 +8,8 @@ from typing import Annotated, TypedDict
 
 from langfuse import get_client, observe
 
-from brain import llm
+from brain import gate, llm
+from brain.handoff import WebexHandoff, make_key
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
 from brain.scope import READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
 from brain.status import answer_agrees, final_status
@@ -21,6 +22,9 @@ class State(TypedDict, total=False):
     messages: Annotated[list, operator.add]   # whole conversation, survives restarts
     facts: list
     constraints: list
+    handoffs: dict        # idempotency key -> handoff already made in this conversation
+    handoff: dict         # this turn's handoff, if any
+    handoff_calls: int
     closed: list          # intents of topics the user closed (their raw turns and rows are dropped)
     # per turn
     message: str
@@ -66,7 +70,7 @@ async def classify(state: State, config) -> dict:
                                                                    and any(i in f for i in ids))]
             closed.append(prev)
         facts.append(f"decision: closed - {plan.closes_topic}")
-    return {"plan": plan.model_dump(), "closed": closed, "facts": _union(facts, plan.relevant_facts),
+    return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "facts": _union(facts, plan.relevant_facts),
             "constraints": _union(state.get("constraints"), plan.relevant_constraints),
             "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": []}
 
@@ -158,7 +162,9 @@ async def gather(state: State, config) -> dict:
 def after_gather(state: State) -> str:
     plan = TurnPlan(**state["plan"])
     used = any(not t.get("rejected") for t in state["tool_log"])
-    return "rearm" if (plan.requires_tools and not used and not state["rearmed"] and not state["error"]) else "answer"
+    if plan.requires_tools and not used and not state["rearmed"] and not state["error"]:
+        return "rearm"
+    return "handoff" if plan.intent == "access_request" and not state["error"] else "answer"
 
 
 @observe(name="rearm")
@@ -167,6 +173,45 @@ async def rearm(state: State, config) -> dict:
     wide = widen_reads(state["visible"])
     _meta(visible_tools=wide)
     return {"visible": wide, "rearmed": True}
+
+
+def _employees(state: State) -> dict:
+    """id -> full name for every employee row this conversation has seen (facts and this turn's evidence)."""
+    seen = {}
+    for f in state.get("facts") or []:
+        m = re.search(r"\[db:employees/(E\d+)\].*?full_name=([^,]+)", f)
+        if m:
+            seen[m.group(1)] = m.group(2).strip()
+    for e in state.get("evidence") or []:
+        for r in e["result"] if isinstance(e["result"], list) else []:
+            if isinstance(r, dict) and r.get("employee_id") and r.get("full_name"):
+                seen[r["employee_id"]] = r["full_name"]
+    return seen
+
+
+@observe(name="handoff")
+async def handoff(state: State, config) -> dict:
+    """Maya proposes, never files. On an explicit ask to act, code builds ONE typed handoff for the Webex side.
+    The subject is matched by exact full name against employees already seen, so Maya Cohen is never Maya Rosen."""
+    plan = TurnPlan(**state["plan"])
+    cfg = config["configurable"]
+    if plan.intent != "access_request" or not gate.consent_from_message(state["message"]):
+        return {"handoff": None}
+    ids = [i for i, n in _employees(state).items() if plan.subject_name and n.lower() == plan.subject_name.lower()]
+    if len(ids) != 1 or not plan.system_name.strip():
+        _meta(handoff="not made", matches=ids, system=plan.system_name)
+        return {"handoff": None}
+    h = WebexHandoff(subject_employee_id=ids[0], system=plan.system_name.strip(),
+                     justification=f"Requested by {cfg['toolbox'].caller_id}: {gate.top_level(state['message']).strip()[:200]}",
+                     conversation_id=cfg["thread_id"], caller_id=cfg["toolbox"].caller_id,
+                     idempotency_key=make_key(ids[0], plan.system_name, cfg["thread_id"]))
+    made, calls = dict(state.get("handoffs") or {}), state.get("handoff_calls") or 0
+    if h.idempotency_key not in made:  # a replay never reaches the port a second time
+        res = await cfg["webex_port"].request_access(h)
+        made[h.idempotency_key] = {**h.model_dump(), "result": res.model_dump()}
+        calls += 1
+    _meta(handoff=made[h.idempotency_key], handoff_calls=calls)
+    return {"handoff": made[h.idempotency_key], "handoffs": made, "handoff_calls": calls}
 
 
 ANSWER_SYSTEM = (
@@ -210,11 +255,17 @@ async def answer(state: State, config) -> dict:
         body = (f"Facts: {state.get('facts')}\nConstraints: {state.get('constraints')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
                 f"Evidence:\n{_evidence_text(state['evidence'])}\n\nQuestion:\n{state['message']}")
+        if state.get("handoff"):
+            body += (f"\n\nA handoff to the Webex workflow was recorded as PENDING for {state['handoff']['subject_employee_id']} "
+                     f"({state['handoff']['system']}). It is not filed, approved or granted.")
         text = llm.complete([{"role": "user", "content": body}], ANSWER_SYSTEM.format(status=status), max_tokens=700)
+    h = state.get("handoff")
     if not answer_agrees(status, text):
         _meta(guard_rewrote_answer=True, original_answer=text[:400])
         text = ("I have not filed or granted anything. That would need the caller's explicit go-ahead "
                 "and the recorded approvals first.")
+    if h and "pending" not in text.lower():  # the application, not the model, guarantees the honest outcome
+        text += f" The {h['system']} access request for {h['subject_employee_id']} is pending; it is not filed, approved or in effect yet."
     _meta(status=status)
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     return {"answer": text, "status": status, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
@@ -227,18 +278,20 @@ def route_classify(state: State) -> str:
 
 
 def after_scope(state: State) -> str:
-    return "gather" if state["visible"] else "answer"
+    return "gather" if state["visible"] else ("handoff" if state["plan"]["intent"] == "access_request" else "answer")
 
 
 def build_graph(checkpointer):
     from langgraph.graph import END, START, StateGraph
     g = StateGraph(State)
-    for n, f in [("classify", classify), ("scope", scope), ("gather", gather), ("rearm", rearm), ("answer", answer)]:
+    for n, f in [("classify", classify), ("scope", scope), ("gather", gather), ("rearm", rearm), ("handoff", handoff),
+                 ("answer", answer)]:
         g.add_node(n, f)
     g.add_edge(START, "classify")
     g.add_conditional_edges("classify", route_classify, {"scope": "scope", "answer": "answer"})
-    g.add_conditional_edges("scope", after_scope, {"gather": "gather", "answer": "answer"})
-    g.add_conditional_edges("gather", after_gather, {"rearm": "rearm", "answer": "answer"})
+    g.add_conditional_edges("scope", after_scope, {"gather": "gather", "handoff": "handoff", "answer": "answer"})
+    g.add_conditional_edges("gather", after_gather, {"rearm": "rearm", "handoff": "handoff", "answer": "answer"})
     g.add_edge("rearm", "gather")
+    g.add_edge("handoff", "answer")
     g.add_edge("answer", END)
     return g.compile(checkpointer=checkpointer)
