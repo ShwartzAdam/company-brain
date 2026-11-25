@@ -88,7 +88,8 @@ async def gather(state: State, config) -> dict:
     error = ""
     bad = 0
     for _ in range(MAX_STEPS):
-        user = (f"Constraints: {state.get('constraints')}\nFacts: {state.get('facts')}\n"
+        user = (f"Caller employee id (use it for 'me'/'my'): {box.caller_id}\n"
+                f"Constraints: {state.get('constraints')}\nFacts: {state.get('facts')}\n"
                 f"Recent conversation:\n{render(window(state.get('messages') or []))}\n\n"
                 f"Newest message:\n{state['message']}\n\nEvidence so far:\n{_evidence_text(ev)}")
         out = llm.complete([{"role": "user", "content": user}],
