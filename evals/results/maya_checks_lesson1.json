@@ -1,0 +1,25 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t12: missing 'Finance' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S4-constraint-carry t8: missing 'Finance' (turn-1 threshold still flagged when the user lifts the filing rule)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)"
+ ],
+ "closed": [],
+ "citations": [
+  "S2-onboarding-maya t3: cites 'documents/policies/byod_policy.md' which was never retrieved"
+ ],
+ "writes": [],
+ "handoff": [
+  "S2-onboarding-maya t10: no typed handoff (extra.handoff missing)"
+ ],
+ "restart": [],
+ "arguments": [],
+ "faithful": [
+  "S2-onboarding-maya t2: faithfulness 0.50, unsupported ['her offer letter says she needs on day one']",
+  "S2-onboarding-maya t8: faithfulness 0.00, unsupported ['There is no available Webex seat for Maya Cohen (E001); the subscription SUB001 is over its seat limit with 42 active seats against a limit of 40, showing -2 seats available and is marked as over limit', 'Due to the Q3 SaaS freeze [constraints], requesting a new seat is not possible until after the freeze ends.']",
+  "S2-onboarding-maya t11: faithfulness 0.00, unsupported ['Add employee self-service profile in BambooHR (planned, due 2026-07-28)', 'db:onboarding_tasks/OT006']",
+  "S9-maya-own-account t4: faithfulness 0.00, unsupported ['How do I get promoted here? What does the path look like for a CSM?', 'Thanks. How do I get my software licenses sorted?', \"And what does the manager's guide say about giving feedback in someone's first 90 days?\"]"
+ ]
+}

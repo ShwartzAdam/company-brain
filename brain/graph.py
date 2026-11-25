@@ -9,12 +9,12 @@ from typing import Annotated, TypedDict
 from langfuse import get_client, observe
 
 from brain import llm
-from brain.plan import CLASSIFY_SYSTEM, TurnPlan, classify_prompt, parse_plan, render, window
+from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
 from brain.scope import READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
 from brain.status import answer_agrees, final_status
 
 MAX_STEPS = 6
-MAX_FACTS = 30
+MAX_FACTS = 60
 
 
 class State(TypedDict, total=False):
@@ -46,7 +46,10 @@ def _meta(**kw):
 @observe(name="classify")
 async def classify(state: State, config) -> dict:
     msgs = classify_prompt(state.get("messages") or [], state["message"], state.get("facts"), state.get("constraints"))
-    plan = parse_plan(llm.complete(msgs, CLASSIFY_SYSTEM, max_tokens=500, temperature=0))
+    try:
+        plan = parse_plan(llm.structured(msgs, CLASSIFY_SYSTEM, PLAN_SCHEMA, name="classify", max_tokens=500))
+    except ValueError:  # no valid plan twice: fail open for reads only
+        plan = TurnPlan()
     _meta(intent=plan.intent, requires_tools=plan.requires_tools, refuse=plan.refuse)
     return {"plan": plan.model_dump(), "facts": _union(state.get("facts"), plan.relevant_facts),
             "constraints": _union(state.get("constraints"), plan.relevant_constraints),
@@ -65,6 +68,8 @@ GATHER_SYSTEM = (
     '  {{"tool": "<name>", "args": {{...}}}}  to call a visible tool, or  {{"done": true}}  when you have enough.\n'
     "Visible tools this turn (no others exist for you):\n{tools}\n"
     "Rules: do not repeat a call that already has a result; use employee ids from results, never guess them; "
+    "'she/he/her/him/they' means the person named in the conversation, NEVER the caller: look that person up by full name and use their id; "
+    "looking up who someone is does NOT answer a question about their tickets, tasks or assets: call that records tool with the id before done; "
     "stop with done as soon as the question can be answered. Never call anything to file or approve.")
 
 
@@ -92,12 +97,12 @@ async def gather(state: State, config) -> dict:
                 f"Constraints: {state.get('constraints')}\nFacts: {state.get('facts')}\n"
                 f"Recent conversation:\n{render(window(state.get('messages') or []))}\n\n"
                 f"Newest message:\n{state['message']}\n\nEvidence so far:\n{_evidence_text(ev)}")
-        out = llm.complete([{"role": "user", "content": user}],
-                           GATHER_SYSTEM.format(tools=box.describe(visible)), max_tokens=400, temperature=0)
-        m = re.search(r"\{.*\}", out, re.S)
+        schema = {"type": "object", "properties": {"tool": {"type": "string", "enum": list(visible)},
+                                                   "args": {"type": "object"}, "done": {"type": "boolean"}}}
         try:
-            act = json.loads(m.group(0))
-        except (AttributeError, ValueError):
+            act = llm.structured([{"role": "user", "content": user}], GATHER_SYSTEM.format(tools=box.describe(visible)),
+                                 schema, name="action", max_tokens=400)
+        except ValueError:
             bad += 1
             if bad > 1:
                 error = "model did not return a valid action"
@@ -109,6 +114,11 @@ async def gather(state: State, config) -> dict:
         if name not in visible or name not in box.specs:  # defence in depth: the executor enforces scope
             log.append({"tool": name, "rejected": True})
             ev.append({"tool": name, "args": args, "result": "REJECTED: tool not visible this turn"})
+            continue
+        gap = box.missing_args(name, args)
+        if gap:  # tell the model once, do not crash the turn on a bad call
+            log.append({"tool": name, "rejected": True})
+            ev.append({"tool": name, "args": args, "result": f"REJECTED: missing required argument(s) {gap}"})
             continue
         if any(e["tool"] == name and e["args"] == args for e in ev):  # a repeat call means the model is looping
             break
@@ -153,6 +163,25 @@ ANSWER_SYSTEM = (
     "something up, say so. At most six sentences. Terminal status of this turn: {status}.")
 
 
+def _row_facts(evidence: list) -> list[str]:
+    """Memory of what the tools returned, written by code: one compact line per database row. Never the
+    model's own prose, so a wrong sentence cannot become a fact. (Top document passages are kept too, so a follow-up needs no new search.)"""
+    out = []
+    for e in evidence:
+        docs = 0
+        for part in e["result"] if isinstance(e["result"], list) else []:
+            if not isinstance(part, dict):
+                continue
+            src = str(part.get("source", ""))
+            if src.startswith("db:"):
+                body = ", ".join(f"{k}={v}" for k, v in part.items() if k != "source" and v not in (None, ""))
+                out.append(f"[{src}] {body}"[:240])
+            elif src.startswith("documents/") and part.get("text") and docs < 3:  # top passages, so follow-ups need no new search
+                docs += 1
+                out.append(f"[{src}] {part.get('section', '')}: {' '.join(part['text'].split())[:300]}")
+    return out
+
+
 @observe(name="answer")
 async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
@@ -171,8 +200,8 @@ async def answer(state: State, config) -> dict:
         text = ("I have not filed or granted anything. That would need the caller's explicit go-ahead "
                 "and the recorded approvals first.")
     _meta(status=status)
-    digest = [f"Q: {state['message'][:100]} -> A: {re.sub(chr(10), ' ', text)[:350]}"] if state["tool_log"] else []
-    return {"answer": text, "status": status, "facts": _union(state.get("facts"), digest),
+    # The assistant's own sentences are never stored as facts: facts come from the user's words only.
+    return {"answer": text, "status": status, "facts": _union(state.get("facts"), _row_facts(state["evidence"])),
             "messages": [{"role": "user", "content": state["message"]}, {"role": "assistant", "content": text}]}
 
 

@@ -11,7 +11,8 @@ RUBRIC = (
     "You grade whether an assistant's answer is FAITHFUL to its evidence. You get the user's messages so far, "
     "the evidence the assistant gathered (tool results with their `source`), and the answer.\n"
     "A claim is supported if the evidence or the user's own messages state it. Common knowledge phrases and "
-    "statements about what could not be done are not claims. A cited source that is not in the evidence is "
+    "statements about what could not be done are not claims. Text the USER wrote or pasted (including forwarded emails and "
+    "quoted questions) is the user's, not an assistant claim: grade only the assistant's own statements.  A cited source that is not in the evidence is "
     "unsupported. Numbered citations like [1] are unsupported.\n"
     'Return ONLY JSON: {"score": <0.0-1.0, the fraction of factual claims supported>, '
     '"unsupported": [<each unsupported claim, quoted briefly>]}')

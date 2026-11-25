@@ -88,7 +88,8 @@ def test_invisible_tool_is_rejected_and_never_called(scripted, hits, tmp_path):
     scripted(plan("policy_question"), '{"tool":"create_access_request","args":{"employee_id":"E010"}}',
              '{"done":true}', "I could not file anything.")
     r = turn("E010", "file a webex request", "t-d", tmp_path)
-    assert counts() == before and r.tool_sequence == ["create_access_request"]  # logged as rejected
+    # the action schema only lists visible tools, so the hidden write is refused before the executor sees it
+    assert counts() == before and r.tool_sequence == [] and "create_access_request" not in r.visible_tools
     assert not set(r.visible_tools) & WRITE_TOOLS
 
 
@@ -193,3 +194,69 @@ def test_unknown_corpus_is_dropped_but_audience_filter_stays(monkeypatch):
     assert seen == {"corpus": None, "c": "E010"}
     tools.search_documents("x", "E010", corpus="policies")
     assert seen["corpus"] == "policies"
+
+
+# ---- repairs: facts from code, snapshot rule, argument validation ----
+def test_facts_hold_tool_rows_never_the_models_sentences(scripted, hits, tmp_path):
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}',
+             "Rachel's checklist is empty and her ticket is blocked.")
+    turn("E010", "any tickets for Rachel Stein?", "t-j", tmp_path)
+    b = scripted(plan("ticket_status", False), "ok")
+    turn("E010", "remind me", "t-j", tmp_path)
+    ctx = b.calls[0][0][0]["content"]
+    assert "db:tickets/T001" in ctx and "checklist is empty" not in ctx.split("Recent conversation")[0]
+
+
+def test_snapshot_rule_is_in_the_classify_prompt():
+    from brain.plan import CLASSIFY_SYSTEM
+    assert "OLD SNAPSHOT" in CLASSIFY_SYSTEM and "ONLY from the user's own words" in CLASSIFY_SYSTEM
+
+
+def test_missing_required_argument_is_rejected_not_crashed(scripted, hits, tmp_path):
+    scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{}}',
+             '{"tool":"get_employee","args":{"query":"E010"}}', '{"done":true}', "Rachel is E010.")
+    r = turn("E010", "who is Rachel Stein?", "t-k", tmp_path)
+    assert r.status == "completed" and not r.error
+    assert r.tool_sequence == ["get_employee", "get_employee"]  # first call logged as rejected, second ran
+
+
+# ---- lesson fixes: forced-tool structured output, `other` fails open ----
+def test_structured_validates_retries_once_then_raises(scripted):
+    from brain import llm
+    b = scripted("not json", '{"tool": "x"}')
+    schema = {"type": "object", "properties": {"tool": {"type": "string"}}, "required": ["tool"]}
+    assert llm.structured([{"role": "user", "content": "q"}], "s", schema) == {"tool": "x"} and len(b.calls) == 2
+    b2 = scripted("nope")
+    import pytest
+    with pytest.raises(ValueError):
+        llm.structured([{"role": "user", "content": "q"}], "s", schema)
+    assert len(b2.calls) == 2  # one try + one retry, no more
+
+
+def test_structured_uses_forced_tool_backend_when_present():
+    from brain import llm
+
+    class Forced:
+        def structured(self, messages, system, name, schema, max_tokens, temperature):
+            return {"intent": "policy_question", "requires_tools": True}
+
+        def complete(self, *a):
+            raise AssertionError("text path must not run")
+    llm.set_backend(Forced())
+    try:
+        from brain.plan import PLAN_SCHEMA, parse_plan
+        out = llm.structured([{"role": "user", "content": "q"}], "s", PLAN_SCHEMA, name="classify")
+        assert parse_plan(out).intent == "policy_question"
+    finally:
+        llm.set_backend(None)
+
+
+def test_other_intent_sees_every_read_tool_and_no_write():
+    sc, tools = select_tools(TurnPlan(intent="other"))
+    assert sc == "maya" and set(tools) == set(READ_TOOLS) and not set(tools) & WRITE_TOOLS
+
+
+def test_plan_schema_and_prompt_carry_the_lesson_rules():
+    from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA
+    assert PLAN_SCHEMA["properties"]["intent"] and "first question" in CLASSIFY_SYSTEM
+    assert "quoted from the Known facts" in CLASSIFY_SYSTEM
