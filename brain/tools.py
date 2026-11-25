@@ -9,6 +9,7 @@ def search_documents(query: str, caller_id: str, corpus: str | None = None, k: i
 
 
 def get_employee(query: str) -> list[dict]:
+    """Find employees by id, email or name; returns id, role, manager, group."""
     like = f"%{query}%"
     return db.rows(
         "SELECT employee_id, full_name, email, role, department_id, manager_id, location, "
@@ -18,11 +19,13 @@ def get_employee(query: str) -> list[dict]:
 
 
 def list_direct_reports(manager_id: str) -> list[dict]:
+    """List the employees who report to a manager id."""
     return db.rows("SELECT employee_id, full_name, role, status FROM employees "
                    "WHERE manager_id = ? ORDER BY full_name", (manager_id,))
 
 
 def check_software_subscription(software: str) -> list[dict]:
+    """Seat limit, ACTIVE seats, over-limit flag, annual cost and renewal date for a software/vendor name."""
     like = f"%{software}%"
     out = db.rows(
         "SELECT sub.subscription_id, sys.system_name, v.vendor_name, sub.contract_id, sub.seat_limit, "
@@ -49,17 +52,20 @@ def get_contract(query: str) -> list[dict]:
 
 
 def list_onboarding_tasks(employee_id: str) -> list[dict]:
+    """Onboarding checklist tasks and their status for an employee id."""
     return db.rows("SELECT task_id, task_type, description, owner_group, status, due_date, related_system_id "
                    "FROM onboarding_tasks WHERE employee_id = ? ORDER BY due_date, task_id", (employee_id,))
 
 
 def check_asset_inventory(asset_type: str = "", location: str = "") -> list[dict]:
+    """Hardware assets by type and location with status."""
     return db.rows("SELECT asset_id, asset_type, model, status, location, employee_id, notes FROM assets "
                    "WHERE lower(asset_type) LIKE lower(?) AND lower(location) LIKE lower(?) "
                    "ORDER BY asset_type, asset_id", (f"%{asset_type}%", f"%{location}%"))
 
 
 def list_employee_tickets(employee_id: str, status: str = "") -> list[dict]:
+    """Tickets for an employee id, optionally by status."""
     return db.rows("SELECT ticket_id, category, subcategory, priority, status, subject, created_at, "
                    "assigned_team, related_system_id FROM tickets "
                    "WHERE employee_id = ? AND lower(status) LIKE lower(?) ORDER BY created_at DESC",

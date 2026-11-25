@@ -119,16 +119,6 @@ def test_mcp_server_lists_tools():
             "request_approval", "search_documents"} <= names
 
 
-def test_ask_answer_uses_one_llm_call(fake_llm):
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("ask", ROOT / "scripts/ask.py")
-    ask = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ask)
-    out = ask.answer("q?", [{"source": "documents/policies/equipment_policy.md", "text": "five days"}])
-    assert out == "fake reply" and len(fake_llm.calls) == 1
-    assert "equipment_policy.md" in fake_llm.calls[0][0][0]["content"]
-
-
 def test_keyword_query_carries_audience_filter(fake_llm):
     body = retrieval.build_keyword_body("promotion", "E010", 5, None)
     assert {"term": {"audience": "all"}} in body["query"]["bool"]["filter"]

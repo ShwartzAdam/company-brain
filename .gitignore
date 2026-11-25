@@ -10,3 +10,5 @@ __pycache__/
 results/
 # Dataset copy: contains restricted source documents (manager_playbook). Never committed.
 data/
+*.db-shm
+*.db-wal

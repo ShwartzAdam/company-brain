@@ -28,7 +28,8 @@ CLASSIFY_SYSTEM = (
     '{"intent": <intent>, "requires_tools": bool, "relevant_facts": [str], "relevant_constraints": [str], '
     '"clarify_question": str, "refuse": bool}\n'
     "- Classify the newest message only; follow subject changes.\n"
-    "- relevant_facts: values from earlier turns later answers need (ids, dates, numbers, names), the value itself.\n"
+    "- relevant_facts: always record the names of people and systems the user asks about, plus ids, dates and numbers, the value itself.\n"
+    "- A question about what was said or who/what was asked earlier is answered from facts: requires_tools False.\n"
     "- relevant_constraints: rules the user stated that are still in force (spending thresholds, 'do not file').\n"
     "- requires_tools is False only for recaps and reasoning over facts already in this conversation; a new "
     "topic or a first question is True. Drafting text is not a tool need.\n"

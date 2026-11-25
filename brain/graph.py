@@ -109,6 +109,8 @@ async def gather(state: State, config) -> dict:
             log.append({"tool": name, "rejected": True})
             ev.append({"tool": name, "args": args, "result": "REJECTED: tool not visible this turn"})
             continue
+        if any(e["tool"] == name and e["args"] == args for e in ev):  # a repeat call means the model is looping
+            break
         with get_client().start_as_current_observation(name=f"tool.{name}", as_type="tool",
                                                         input={"args": args}) as sp:
             try:
@@ -144,7 +146,7 @@ async def rearm(state: State, config) -> dict:
 ANSWER_SYSTEM = (
     "You are the NovaOps internal assistant. Answer the user's CURRENT request from the evidence and the "
     "established facts only; never invent an employee, number or rule. Cite document evidence by its file path "
-    "in brackets. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
+    "in brackets. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
     "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
     "request to file something, say it has NOT been filed and what would be needed. If you could not look "
     "something up, say so. At most six sentences. Terminal status of this turn: {status}.")
@@ -168,7 +170,8 @@ async def answer(state: State, config) -> dict:
         text = ("I have not filed or granted anything. That would need the caller's explicit go-ahead "
                 "and the recorded approvals first.")
     _meta(status=status)
-    return {"answer": text, "status": status,
+    digest = [f"Q: {state['message'][:100]} -> A: {re.sub(chr(10), ' ', text)[:350]}"] if state["tool_log"] else []
+    return {"answer": text, "status": status, "facts": _union(state.get("facts"), digest),
             "messages": [{"role": "user", "content": state["message"]}, {"role": "assistant", "content": text}]}
 
 

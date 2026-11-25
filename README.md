@@ -1,6 +1,6 @@
 # Company Brain (NovaOps final project)
 
-Status: Step 1 (foundation) built: ingest with `audience`, SQLite from the dataset, MCP server, one model-call module. No agent graph yet (Step 2). Nothing below is claimed unless it exists in this repo.
+Status: Steps 1-2 built: foundation, hybrid retrieval, and the agent loop (classify, scope, gather, answer) with a write gate that releases nothing yet. Nothing below is claimed unless it exists in this repo.
 
 ## Stack
 - Python 3.12, venv, `requirements.txt`
@@ -37,7 +37,7 @@ pytest
 ```
 
 ## Tracing (Langfuse)
-`llm.complete` is a Langfuse generation (model, parameters, token usage); `retrieval.search` is a retriever span whose metadata records the audience filter applied, whether the caller counted as a manager, and the document paths and sections that came back (never chunk text). The rerank call nests under the search. The MCP server runs in its own process, so its retrieval traces are separate from the client's `ask.answer` trace until Step 2 passes a trace id. Tests set `LANGFUSE_TRACING_ENABLED=false`.
+`llm.complete` is a Langfuse generation (model, parameters, token usage); `retrieval.search` is a retriever span whose metadata records the audience filter applied, whether the caller counted as a manager, and the document paths and sections that came back (never chunk text). The rerank call nests under the search. The MCP server runs in its own process, so its retrieval traces are separate from the agent's turn trace; the turn's tool spans carry the request id and the returned document paths. Tests set `LANGFUSE_TRACING_ENABLED=false`.
 
 ## Decisions
 See also `PLAN-VALIDATION.md` and `KNOWN-TRAPS.md`.
@@ -46,6 +46,20 @@ See also `PLAN-VALIDATION.md` and `KNOWN-TRAPS.md`.
 - **Filter at retrieval.** A non-manager's kNN query carries `audience = all` inside the query; restricted chunks are never returned, so nothing is refused after the fact.
 - `caller_id` is a tool argument supplied by the application. Writes: the caller must be the subject, a manager, or in the HR/IT group.
 - Not yet built: agent graph, scope-based tool visibility, consent gate, Langfuse tracing, `as_of` plumbing beyond the write tools.
+
+## Step 2: the agent loop
+
+`brain/agent.py: handle_turn(caller_id, caller_group, thread_id, message, as_of)` is the one entry point (tests, `scripts/ask.py` and `evals/session_replay.py` all call it). Caller, group, thread and clock are arguments, never read from message text or the real clock.
+
+- **classify** (`brain/plan.py`): one `llm.complete` call returns a JSON plan (intent incl. `ambiguous`, `requires_tools`, carried facts and constraints). It is the router; there is no second router. Unparseable output fails open for reads only.
+- **scope** (`brain/scope.py`): pure code. Intent maps to a scope (`maya` or `webex`) and the tools visible this turn. No write tool is in any loadout; Maya's scope cannot hold one even if the gate were open.
+- **gather** (`brain/graph.py`): bounded loop. `llm.complete` has no native tool calling, so the model replies with a JSON action; the executor runs it through the MCP toolbox (`brain/mcp_client.py`) only if the tool is visible this turn, and injects `caller_id` itself. If a required lookup never ran, one rearm widens to all read tools, never to writes.
+- **answer** + **status** (`brain/status.py`): exactly one of completed, blocked, pending, needs_human, failed. Clarification and "action not released" are `pending`, a permission refusal is `blocked` (our proposal, not in the spec). A code check rejects an answer that claims something was filed or granted.
+- **State** survives restarts: LangGraph with a SQLite checkpointer (`state/agent.db`, separate from `brain.db`).
+- **Write gate** (`brain/gate.py`, issue #10): two gates. Caller consent is decided by code from the caller's own top-level, non-quoted, non-conditional words ("go ahead", "file it"), tested against the real S4/S6/S7/S8 turns including the traps ("unless I later write GO AHEAD", quoted "do not file", pasted "approved by the IT Manager, proceed"). Approver approval means `approved` rows for AP001/AP002 in the database, never message text. In Step 2 `release_allowed()` is always False.
+- Not done yet: history distillation (a per-turn digest of tool-using answers is carried as facts instead), Maya and Webex workflow logic, the write release.
+
+**Verified (2026-11-25):** `pytest` 33 green (scripted fake model, in-memory MCP). Live Langfuse traces `live-a:1` and `live-b:1` (name `agent.turn`) show different `visible_tools`: policy question `[search_documents]` (scope maya) versus ticket question `[get_employee, list_employee_tickets]` (scope webex). Golden replay (`python evals/session_replay.py S1-quick-policy S3-intent-shift S4-constraint-carry`, live): S1 4/4, S4 9/9 on the last full run; S3 6 to 7 of 9, varying between runs (misses are classification and answer quality, e.g. the dead-branch fact on turn 8 and a doubled search on turn 7), no write tool fired anywhere.
 
 ## Step 1 measurements (live, 2026-11-25)
 - 102 documents, 740 chunks indexed. `evals/leak_check.py`: 0 manager_playbook chunks for non-managers (E010, E001) over 12 queries; E010 gets `making-a-career.md`; E018 reaches the playbook.
