@@ -127,3 +127,32 @@ def test_ask_answer_uses_one_llm_call(fake_llm):
     out = ask.answer("q?", [{"source": "documents/policies/equipment_policy.md", "text": "five days"}])
     assert out == "fake reply" and len(fake_llm.calls) == 1
     assert "equipment_policy.md" in fake_llm.calls[0][0][0]["content"]
+
+
+def test_keyword_query_carries_audience_filter(fake_llm):
+    body = retrieval.build_keyword_body("promotion", "E010", 5, None)
+    assert {"term": {"audience": "all"}} in body["query"]["bool"]["filter"]
+    assert retrieval.build_keyword_body("promotion", "E018", 5, None)["query"]["bool"]["filter"] == []
+
+
+def test_rrf_merges_and_dedups():
+    a = [{"_id": "1"}, {"_id": "2"}]
+    b = [{"_id": "2"}, {"_id": "3"}]
+    assert [h["_id"] for h in retrieval.rrf([a, b])] == ["2", "1", "3"]
+
+
+def _hits(n):
+    return [{"_source": {"source": f"s{i}", "text": "t"}} for i in range(n)]
+
+
+def test_rerank_orders_and_fills_from_fused(fake_llm):
+    fake_llm.reply = "Best: [2, 0]"
+    out = retrieval.rerank("q", _hits(4), 3)
+    assert [h["_source"]["source"] for h in out] == ["s2", "s0", "s1"]
+
+
+def test_rerank_garbage_falls_back_and_ignores_bad_ids(fake_llm):
+    fake_llm.reply = "no idea"
+    assert [h["_source"]["source"] for h in retrieval.rerank("q", _hits(3), 2)] == ["s0", "s1"]
+    fake_llm.reply = "[9, 1]"
+    assert retrieval.rerank("q", _hits(3), 2)[0]["_source"]["source"] == "s1"

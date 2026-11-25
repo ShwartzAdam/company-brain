@@ -29,7 +29,7 @@ python scripts/check_services.py
 
 Run (venv active):
 ```bash
-python scripts/ingest.py                      # rebuilds the index (embeds ~740 chunks)
+python scripts/ingest.py                      # rebuilds the index (embeds ~740 chunks, about 7 minutes)
 python -m server.server                       # MCP server
 python scripts/ask.py --caller E010 "What's the NovaOps policy on using a personal laptop for work?"
 python evals/retrieval_check.py && python evals/leak_check.py
@@ -46,5 +46,5 @@ See also `PLAN-VALIDATION.md` and `KNOWN-TRAPS.md`.
 
 ## Step 1 measurements (live, 2026-11-25)
 - 102 documents, 740 chunks indexed. `evals/leak_check.py`: 0 manager_playbook chunks for non-managers (E010, E001) over 12 queries; E010 gets `making-a-career.md`; E018 reaches the playbook.
-- `evals/retrieval_check.py` recall@5: 0.53 on the 5 `retrieval_expectations`, 0.55 on the 20 `single_turn_cases`. Some expected sources are database tables (`contracts`, `onboarding_tasks`), which document retrieval cannot return, so the score understates; improving it (hybrid search, k) is open work, not claimed.
+- Retrieval: vector + BM25 (30 candidates each), fused by reciprocal rank, reranked by Nova to 5. The audience filter is in both queries; the reranker only sees filtered chunks. `evals/retrieval_check.py` scores documents only (database tables are not retrievable here; three cases need the agent's second search and are listed, not scored). Mean recall@5, 5 `retrieval_expectations` / 16 `single_turn_cases`: vector 0.53 / 0.71, hybrid 0.60 / 0.62, hybrid + rerank 0.70 / 0.89. A pool of 50 was worse (0.68 / 0.79), so 30 stays. Remaining misses are general policies (`access_management_policy`, `onboarding_policy`) outranked by person- or product-specific files; the agent loop's follow-up searches are the next lever. `evals/diagnose.py` shows each miss's rank.
 - S1-quick-policy turn 1 via `scripts/ask.py --caller E010`: answers "five business days" with a cited `policies/equipment_policy.md`.
