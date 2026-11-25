@@ -40,3 +40,24 @@ def fresh_db(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DB_PATH", p)
     db.reset_db(p)
     return p
+
+
+class ScriptedBackend(FakeBackend):
+    """Replies from a queue in call order; the last one repeats."""
+    def __init__(self, replies):
+        super().__init__()
+        self.q = list(replies)
+
+    def complete(self, messages, system, max_tokens, temperature):
+        self.calls.append((messages, system))
+        return self.q.pop(0) if len(self.q) > 1 else self.q[0]
+
+
+@pytest.fixture
+def scripted():
+    def make(*replies):
+        b = ScriptedBackend(replies)
+        llm.set_backend(b)
+        return b
+    yield make
+    llm.set_backend(None)
