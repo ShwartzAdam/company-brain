@@ -7,12 +7,14 @@ import re
 from typing import Annotated, TypedDict
 
 from langfuse import get_client, observe
+from langgraph.types import interrupt
 
 from brain import checklist, gate, llm
 from brain.handoff import WebexHandoff, make_key
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
 from brain.scope import READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
 from brain.status import answer_agrees, final_status
+from brain.webex import AccessDecision, release_pending
 
 MAX_STEPS = 6
 MAX_FACTS = 60
@@ -25,6 +27,9 @@ class State(TypedDict, total=False):
     handoffs: dict        # idempotency key -> handoff already made in this conversation
     handoff: dict         # this turn's handoff, if any
     handoff_calls: int
+    pending: dict         # request id -> approvals dispatched and not yet released (the durable pause)
+    pause_now: bool       # this turn dispatched approvals: pause after the answer
+    decision: dict        # this turn's typed AccessDecision, built by code
     checklist: dict
     closed: list          # intents of topics the user closed (their raw turns and rows are dropped)
     # per turn
@@ -71,7 +76,7 @@ async def classify(state: State, config) -> dict:
                                                                    and any(i in f for i in ids))]
             closed.append(prev)
         facts.append(f"decision: closed - {plan.closes_topic}")
-    return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "checklist": None, "facts": _union(facts, plan.relevant_facts),
+    return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "decision": None, "pause_now": False, "checklist": None, "facts": _union(facts, plan.relevant_facts),
             "constraints": _union(state.get("constraints"), plan.relevant_constraints),
             "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": []}
 
@@ -161,6 +166,17 @@ async def gather(state: State, config) -> dict:
         log.append({"tool": name, "args": args})
         ev.append({"tool": name, "args": args, "result": res})
         srcs += found
+    plan = TurnPlan(**state["plan"])
+    if (plan.intent == "access_request" and plan.system_name.strip() and "search_documents" in visible and not error
+            and not any("it_kb" in x for x in srcs)):  # #13: the login article is not reliably ranked; one targeted search
+        args = {"query": f"{plan.system_name} license login account not licensed", "corpus": "it_kb"}
+        try:
+            res = await box.call("search_documents", args)
+            log.append({"tool": "search_documents", "args": args})
+            ev.append({"tool": "search_documents", "args": args, "result": res})
+            srcs += _sources(res)
+        except Exception as e:  # noqa: BLE001
+            error = f"search_documents failed: {e}"
     _meta(tool_sequence=[t["tool"] for t in log], rejected=[t["tool"] for t in log if t.get("rejected")],
           sources=sorted(set(srcs)), error=error)
     return {"evidence": ev, "tool_log": log, "sources": sorted(set(srcs)), "error": error}
@@ -202,9 +218,25 @@ async def handoff(state: State, config) -> dict:
     The subject is matched by exact full name against employees already seen, so Maya Cohen is never Maya Rosen."""
     plan = TurnPlan(**state["plan"])
     cfg = config["configurable"]
-    if plan.intent != "access_request" or not gate.consent_from_message(state["message"]):
+    caller = cfg["toolbox"].caller_id
+    # consent: an explicit go-ahead in the caller's own current words, or the caller asking for themselves while
+    # no "do not file" rule is in force (that escalates to humans and grants nothing). Both are regex heuristics.
+    me = _employees(state).get(caller, "").lower()
+    subj = plan.subject_name.strip()
+    # the planner's subject_name is free text ("user", "caller", "new hire in Customer Success"): it names ANOTHER
+    # person only if it reads like a name (capitalised) and is not the caller's own. A heuristic, tested.
+    about_me = not subj or subj.lower() in ("user", "me", "myself", "i", "caller", "requester", me, caller.lower()) or not subj[:1].isupper()
+    mine = (about_me and gate.self_request(state["message"]) and not gate.blocks_filing(state.get("constraints")))
+    if plan.intent != "access_request" or not (gate.consent_from_message(state["message"]) or mine):
         return {"handoff": None}
-    ids = [i for i, n in _employees(state).items() if plan.subject_name and n.lower() == plan.subject_name.lower()]
+    seen = _employees(state)
+    if not (mine and not gate.consent_from_message(state["message"])) and subj and not any(n.lower() == subj.lower() for n in seen.values()):
+        # the caller named someone no earlier lookup returned: code resolves them (exact full name), never the model
+        for r in await cfg["toolbox"].call("get_employee", {"query": subj}):
+            if isinstance(r, dict) and r.get("employee_id"):
+                seen[r["employee_id"]] = r["full_name"]
+    ids = [caller] if mine and not gate.consent_from_message(state["message"]) else [
+        i for i, n in seen.items() if plan.subject_name and n.lower() == plan.subject_name.lower()]
     if len(ids) != 1 or not plan.system_name.strip():
         _meta(handoff="not made", matches=ids, system=plan.system_name)
         return {"handoff": None}
@@ -213,12 +245,26 @@ async def handoff(state: State, config) -> dict:
                      conversation_id=cfg["thread_id"], caller_id=cfg["toolbox"].caller_id,
                      idempotency_key=make_key(ids[0], plan.system_name, cfg["thread_id"]))
     made, calls = dict(state.get("handoffs") or {}), state.get("handoff_calls") or 0
+    pend, pause_now = dict(state.get("pending") or {}), False
     if h.idempotency_key not in made:  # a replay never reaches the port a second time
-        res = await cfg["webex_port"].request_access(h)
+        with get_client().start_as_current_observation(name="approval_transition", as_type="span",
+                                                        input={"handoff": h.model_dump()}) as sp:
+            res = await cfg["webex_port"].request_access(h)
+            sp.update(output=res.decision, metadata={"request_id": cfg["request_id"], "pending": res.pending})
         made[h.idempotency_key] = {**h.model_dump(), "result": res.model_dump()}
         calls += 1
+        if res.pending:
+            pend[res.pending["request_id"]] = res.pending
+            pause_now = True
     _meta(handoff=made[h.idempotency_key], handoff_calls=calls)
-    return {"handoff": made[h.idempotency_key], "handoffs": made, "handoff_calls": calls}
+    dec = made[h.idempotency_key]["result"].get("decision")
+    ev, srcs = list(state.get("evidence") or []), list(state.get("sources") or [])
+    if dec and dec.get("observed_facts"):  # what the workflow read is evidence too, so every citation is traceable
+        rows = [{"source": f["source"], "text": f["text"]} for f in dec["observed_facts"]]
+        ev.append({"tool": "webex_workflow", "args": {"subject": h.subject_employee_id, "system": h.system}, "result": rows})
+        srcs = sorted(set(srcs) | {r["source"] for r in rows})
+    return {"handoff": made[h.idempotency_key], "handoffs": made, "handoff_calls": calls, "pending": pend,
+            "pause_now": pause_now, "decision": dec, "evidence": ev, "sources": srcs}
 
 
 ANSWER_SYSTEM = (
@@ -273,12 +319,47 @@ async def answer(state: State, config) -> dict:
                 "and the recorded approvals first.")
     if h and "pending" not in text.lower():  # the application, not the model, guarantees the honest outcome
         text += f" The {h['system']} access request for {h['subject_employee_id']} is pending; it is not filed, approved or in effect yet."
+    dec = state.get("decision")
+    if dec:  # the typed AccessDecision is built by code; its rendering is appended verbatim to the model's prose
+        d = AccessDecision(**dec)
+        status = d.status
+        text += " " + d.render()
     _meta(status=status)
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(state["evidence"])
     return {"answer": text, "status": status, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
+
+
+@observe(name="pause")
+async def pause(state: State, config) -> dict:
+    """The durable pause (lesson 9). Approvals were dispatched this turn: persist and stop here. Whatever value
+    resumes this node is ignored: only the approval rows, re-read through MCP, decide whether anything is released."""
+    if not state.get("pause_now"):
+        return {}
+    interrupt({"pending": list(state["pending"]), "message": "waiting for recorded approvals"})
+    box = config["configurable"]["toolbox"]
+    pend, notes = dict(state["pending"]), []
+    for rid, p in pend.items():
+        if p["released"]:
+            continue
+        r = await release_pending(box, p)
+        if r["released"]:
+            pend[rid] = {**p, "released": True}
+        notes.append(resume_text(rid, r))
+    text = " ".join(notes)
+    _meta(resumed=True, released=[k for k, v in pend.items() if v["released"]])
+    return {"pending": pend, "answer": text, "status": "needs_human" if all(v["released"] for v in pend.values()) else "pending",
+            "messages": [{"role": "assistant", "content": text}]}
+
+
+def resume_text(rid: str, r: dict) -> str:
+    if r["released"]:
+        return (f"The recorded approvals ({', '.join(sorted(r['approvals']))}) are approved, so request {rid} is released to IT. "
+                "No seat has been assigned: IT still has to assign one once capacity exists.")
+    waiting = ", ".join(k for k, v in r["approvals"].items() if v != "approved")
+    return f"Request {rid} is still waiting on {waiting}. Nothing has been released."
 
 
 def route_classify(state: State) -> str:
@@ -293,7 +374,7 @@ def build_graph(checkpointer):
     from langgraph.graph import END, START, StateGraph
     g = StateGraph(State)
     for n, f in [("classify", classify), ("scope", scope), ("gather", gather), ("rearm", rearm), ("handoff", handoff),
-                 ("answer", answer)]:
+                 ("answer", answer), ("pause", pause)]:
         g.add_node(n, f)
     g.add_edge(START, "classify")
     g.add_conditional_edges("classify", route_classify, {"scope": "scope", "answer": "answer"})
@@ -301,5 +382,6 @@ def build_graph(checkpointer):
     g.add_conditional_edges("gather", after_gather, {"rearm": "rearm", "handoff": "handoff", "answer": "answer"})
     g.add_edge("rearm", "gather")
     g.add_edge("handoff", "answer")
-    g.add_edge("answer", END)
+    g.add_edge("answer", "pause")
+    g.add_edge("pause", END)
     return g.compile(checkpointer=checkpointer)

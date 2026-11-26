@@ -14,13 +14,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import checks  # noqa: E402
 from brain import config  # noqa: E402
 from brain.scope import WRITE_TOOLS  # noqa: E402
 
 AS_OF = "2026-07-01T12:00:00Z"
 RESULTS = Path(__file__).resolve().parent / "results"
 CALLERS = {"S1-quick-policy": ("E010", "UG_REGULAR"), "S3-intent-shift": ("E007", "UG_IT"),
-           "S4-constraint-carry": ("E006", "UG_IT")}
+           "S4-constraint-carry": ("E006", "UG_IT"), "S6-boundary-clean": ("E004", "UG_HR"),
+           "S7-boundary-noisy": ("E004", "UG_HR"), "S8-boundary-heavy-noise": ("E004", "UG_HR")}
 
 
 def has(text: str, spec: str) -> bool:
@@ -82,8 +84,9 @@ def run_session(s: dict, run: int, ck: Path, handle_turn) -> dict:
     for t in s["turns"]:
         r = handle_turn(caller, group, f"{s['id']}#{run}", t["user"], AS_OF, checkpoint_path=ck)
         fails = check_turn(t, r.answer, r.tool_sequence, r.sources, r.extra.get("tool_calls"))
+        sc = checks.score_turn(t, r.extra.get("tool_calls") or [], r.intent)  # lesson 11 diagnostics, not part of ok
         out[str(t["n"])] = {"ok": not fails, "fails": fails, "tools": r.tool_sequence, "status": r.status,
-                            "intent": r.intent}
+                            "intent": r.intent, "scores": {k: v[0] for k, v in sc.items()}}
         print(f"{s['id']}#{run} t{t['n']} {'FAIL' if fails else 'ok  '} intent={r.intent} status={r.status} "
               f"tools={r.tool_sequence} {fails or ''}")
     return out
@@ -118,9 +121,16 @@ def main():
                 e = agg.setdefault(n, {"runs": 0, "passes": 0, "fails": [], "tools": r["tools"], "status": r["status"]})
                 e["runs"] += 1
                 e["passes"] += r["ok"]
+                for k, v in (r.get("scores") or {}).items():  # mean per diagnostic across runs
+                    m = e.setdefault("scores", {}).setdefault(k, [0.0, 0])
+                    m[0] += v
+                    m[1] += 1
                 e["fails"] = sorted(set(e["fails"]) | set(r["fails"]))
         res[s["id"]] = agg
     get_client().flush()
+    for sess in res.values():
+        for e in sess.values():
+            e["scores"] = {k: round(v[0] / v[1], 2) for k, v in (e.get("scores") or {}).items()}
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"{a.label}.json").write_text(json.dumps(res, indent=1, sort_keys=True))
     total = sum(v["runs"] for s in res.values() for v in s.values())

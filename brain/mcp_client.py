@@ -12,6 +12,7 @@ from brain import config
 class Toolbox:
     def __init__(self, session: ClientSession, caller_id: str):
         self.s, self.caller_id, self.specs = session, caller_id, {}
+        self.ctx: dict = {}   # as_of, conversation_id: set by the application per turn, never by the model
 
     async def load(self) -> "Toolbox":
         self.specs = {t.name: t for t in (await self.s.list_tools()).tools}
@@ -37,9 +38,13 @@ class Toolbox:
         return [k for k in sch.get("required") or [] if k not in auto and (args or {}).get(k) in (None, "")]
 
     async def call(self, name: str, args: dict):
-        args = dict(args or {})
-        if "caller_id" in (self.specs[name].inputSchema.get("properties") or {}):
+        args = {k: v for k, v in (args or {}).items() if v is not None}  # a model's explicit nulls mean 'not given'
+        props = self.specs[name].inputSchema.get("properties") or {}
+        if "caller_id" in props:
             args["caller_id"] = self.caller_id
+        for k in ("as_of", "conversation_id"):  # overwrite whatever the model wrote
+            if k in props and k in self.ctx:
+                args[k] = self.ctx[k]
         res = await self.s.call_tool(name, args)
         if res.isError:
             raise RuntimeError(" ".join(getattr(c, "text", "") for c in res.content)[:300])

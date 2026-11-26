@@ -1,11 +1,12 @@
 """SQLite built from the dataset's schema.sql + seed.sql. Parameterised SQL only."""
 import sqlite3
 
-from brain import config
+from brain import config, gate
 
 # Our own table (dataset untouched): one row per idempotent write.
 EXTRA = """CREATE TABLE IF NOT EXISTS write_keys (
-  key TEXT PRIMARY KEY, kind TEXT NOT NULL, entity_id TEXT NOT NULL, created_at TEXT NOT NULL);"""
+  key TEXT PRIMARY KEY, kind TEXT NOT NULL, entity_id TEXT NOT NULL, created_at TEXT NOT NULL);
+""" + gate.DDL + ";"
 
 
 def reset_db(path=None) -> None:

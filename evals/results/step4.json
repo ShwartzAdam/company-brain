@@ -1,0 +1,31 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t12: missing 'Finance' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S4-constraint-carry t8: missing 'Finance' (turn-1 threshold still flagged when the user lifts the filing rule)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)"
+ ],
+ "closed": [],
+ "citations": [
+  "S9-maya-own-account t3: tool-backed answer cites nothing",
+  "S4-constraint-carry t8: cites 'db:tickets/T001' which was never retrieved",
+  "S4-constraint-carry t8: cites 'db:access_requests/AR001' which was never retrieved",
+  "S4-constraint-carry t8: cites 'db:approvals/AP001' which was never retrieved",
+  "S4-constraint-carry t8: cites 'db:approvals/AP002' which was never retrieved"
+ ],
+ "writes": [],
+ "handoff": [],
+ "restart": [],
+ "arguments": [],
+ "faithful": [
+  "S2-onboarding-maya t1: faithfulness 0.50, unsupported ['The Q3 SaaS freeze applies to any onboarding costs for her, as it covers anything that costs the company']",
+  "S2-onboarding-maya t4: faithfulness 0.00, unsupported [\"Rachel Stein's Webex login ticket T001 is open and assigned to IT, with a high priority, created on 2026-07-01, and related to system S001\"]",
+  "S2-onboarding-maya t8: faithfulness 0.75, unsupported ['Because of the Q3 SaaS freeze, no new Webex seats can be added']",
+  "S2-onboarding-maya t11: faithfulness 0.75, unsupported ['Add employee self-service profile in BambooHR (OT006, planned, due 2026-07-28)']",
+  "S9-maya-own-account t1: faithfulness 0.00, unsupported ['For a Customer Success Manager (CSM) aiming for S3, look for ownership of customer health and complex support outcomes, not just many meetings; guide customers through troubled launches, coordinate SupportDesk cases, open precise Jira issues, update Salesforce with renewal risk, and keep customers informed without overpromising', 'Your manager will calibrate the proposal with People Operations and the department leader, and Finance will confirm compensation changes before the decision is final']",
+  "S9-maya-own-account t2: faithfulness 0.00, unsupported ['The only tasks for you from this thread are to sign the equipment responsibility form and finish your BambooHR self-service profile once the invite lands', 'Everything else is being handled by IT or Sara Ben-David']",
+  "S9-maya-own-account t3: faithfulness 0.00, unsupported ['You need to wait for the IT team to finish setting up your Okta baseline groups, and you should also follow up with the CS admin about your Salesforce profile', 'Your Webex seat is being handled by IT as a seat allocation issue, not a profile problem']",
+  "S9-maya-own-account t4: faithfulness 0.00, unsupported [\"The manager's guide about giving feedback in someone's first 90 days has not been found in the available evidence; no relevant document or database entry was returned\"]"
+ ]
+}

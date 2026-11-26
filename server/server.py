@@ -10,8 +10,10 @@ mcp = FastMCP("novaops", host=config.MCP_HOST, port=config.MCP_PORT)
 
 READ = [tools.search_documents, tools.get_employee, tools.list_direct_reports,
         tools.check_software_subscription, tools.get_contract, tools.list_onboarding_tasks,
-        tools.check_asset_inventory, tools.list_employee_tickets, tools.read_approval]
-WRITE = [tools.create_access_request, tools.create_ticket, tools.request_approval]
+        tools.check_asset_inventory, tools.list_employee_tickets, tools.read_approval,
+        tools.list_access_requests, tools.seat_assignment_status]
+WRITE = [tools.create_access_request, tools.create_ticket, tools.request_approval, tools.release_access,
+         tools.record_consent]  # record_consent: called by application code only, in no loadout
 for fn in READ + WRITE:
     mcp.tool()(fn)
 

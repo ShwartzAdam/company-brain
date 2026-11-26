@@ -18,7 +18,9 @@ class WebexHandoff(BaseModel):
 class PendingAccessResult(BaseModel):
     status: Literal["pending"] = "pending"
     idempotency_key: str
-    note: str = "Handed to the Webex workflow. Nothing has been filed, approved or granted."
+    note: str = "Handed to the Webex workflow. Nothing has been approved or granted."
+    decision: dict | None = None   # the typed AccessDecision, built by code
+    pending: dict | None = None    # approvals dispatched and not yet recorded as approved (the durable pause)
 
 
 class WebexPort(Protocol):

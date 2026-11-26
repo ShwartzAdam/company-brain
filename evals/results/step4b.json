@@ -1,0 +1,123 @@
+{
+ "S4-constraint-carry": {
+  "1": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "2": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "5": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "list_access_requests",
+    "search_documents"
+   ]
+  },
+  "9": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S7-boundary-noisy": {
+  "1": {
+   "fails": [
+    "missing fact 'MFA'",
+    "missing fact 'device|trust'"
+   ],
+   "passes": 1,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "fails": [
+    "missing fact 'E010'"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "3": {
+   "fails": [
+    "missing fact 'Webex'"
+   ],
+   "passes": 2,
+   "runs": 3,
+   "status": "pending",
+   "tools": []
+  },
+  "4": {
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "search_documents"
+   ]
+  }
+ }
+}

@@ -1,6 +1,6 @@
 """Tool logic behind the MCP server. The graph never imports this; it calls MCP tools.
 All writes go through release_write(), the only place a write is committed."""
-from brain import db, people, retrieval
+from brain import db, gate, people, retrieval
 
 # ---------- reads ----------
 
@@ -84,6 +84,35 @@ def read_approval(request_id: str) -> list[dict]:
     return _cite(db.rows("SELECT approval_id, request_type, request_id, approver_id, status, decision_reason, "
                    "created_at FROM approvals WHERE request_id = ? ORDER BY approval_id", (request_id,)), "approvals", "approval_id")
 
+
+def list_access_requests(employee_id: str) -> list[dict]:
+    """Access requests already filed for an employee id, with system and status (e.g. AR001 for Webex)."""
+    return _cite(db.rows("SELECT r.request_id, r.employee_id, r.system_id, s.system_name, r.status, "
+                         "r.approver_id, r.decision_reason, r.created_at FROM access_requests r "
+                         "JOIN systems s ON r.system_id = s.system_id WHERE r.employee_id = ? "
+                         "ORDER BY r.request_id", (employee_id,)), "access_requests", "request_id")
+
+
+def seat_assignment_status(system: str) -> list[dict]:
+    """Who holds a seat on a system? The database stores seat COUNTS only, never which employee holds one.
+    Returns that gap, the counts, and the blocked requests and onboarding tasks that do exist."""
+    like = f"%{system}%"
+    subs = check_software_subscription(system)
+    sid = [s["subscription_id"] for s in subs]
+    sysid = db.rows("SELECT system_id FROM systems WHERE lower(system_name) LIKE lower(?)", (like,))
+    ids = [r["system_id"] for r in sysid]
+    out = [{"gap": "Seat assignments are NOT recorded: the database holds seat counts, not which employee holds a seat. "
+                   "Entitlement by role is not a seat assignment.", "subscriptions": sid,
+            "source": f"db:software_subscriptions/{sid[0]}" if sid else "db:software_subscriptions"}]
+    for i in ids:
+        out += _cite(db.rows("SELECT request_id, employee_id, status, decision_reason FROM access_requests "
+                             "WHERE system_id = ? AND status IN ('blocked','pending_approval') ORDER BY request_id", (i,)),
+                     "access_requests", "request_id")
+        out += _cite(db.rows("SELECT task_id, employee_id, status, description FROM onboarding_tasks "
+                             "WHERE related_system_id = ? AND status = 'blocked' ORDER BY task_id", (i,)),
+                     "onboarding_tasks", "task_id")
+    return out
+
 # ---------- writes ----------
 
 def release_write(kind: str, key: str, as_of: str, fn) -> dict:
@@ -111,6 +140,14 @@ def _next_id(c, table: str, col: str, prefix: str) -> str:
     return f"{prefix}{n + 1:03d}"
 
 
+def _system(name: str) -> dict:
+    r = db.rows("SELECT system_id, system_name FROM systems WHERE lower(system_name) LIKE lower(?) "
+                "ORDER BY system_name LIMIT 1", (f"%{name}%",))
+    if not r:
+        raise ValueError(f"no system matching {name!r}")
+    return r[0]
+
+
 def _allowed_actor(caller_id: str, employee_id: str) -> bool:
     if caller_id == employee_id or people.is_manager(caller_id):
         return True
@@ -118,17 +155,25 @@ def _allowed_actor(caller_id: str, employee_id: str) -> bool:
     return bool(r) and r[0]["user_group_id"] in ("UG_HR", "UG_IT")
 
 
+def record_consent(caller_id: str, employee_id: str, system: str, message_id: str, draft: str, as_of: str) -> dict:
+    """CODE-ONLY (never visible to a model): the application records the caller's own current-message consent."""
+    sysrow = _system(system)
+
+    def fn(c):
+        gate.insert_consent(c, message_id, caller_id, employee_id, sysrow["system_name"], draft, as_of)
+        return message_id, {"consent_id": message_id}
+    return release_write("consent", f"consent:{message_id}", as_of, fn)
+
+
 def create_access_request(caller_id: str, employee_id: str, system: str, justification: str,
-                          conversation_id: str, as_of: str) -> dict:
+                          conversation_id: str, as_of: str, consent_id: str) -> dict:
     if not _allowed_actor(caller_id, employee_id):
         raise PermissionError(f"{caller_id} may not file a request for {employee_id}")
-    sysrow = db.rows("SELECT system_id, system_name FROM systems WHERE lower(system_name) LIKE lower(?) "
-                     "ORDER BY system_name LIMIT 1", (f"%{system}%",))
-    if not sysrow:
-        raise ValueError(f"no system matching {system!r}")
+    sysrow = [_system(system)]
     sid = sysrow[0]["system_id"]
 
     def fn(c):
+        gate.check_consent(c, consent_id, caller_id, employee_id, sysrow[0]["system_name"])
         ex = c.execute("SELECT request_id, status FROM access_requests WHERE employee_id = ? AND system_id = ? "
                        "AND status NOT IN ('rejected','denied','cancelled') ORDER BY request_id LIMIT 1",
                        (employee_id, sid)).fetchone()
@@ -164,15 +209,18 @@ def create_ticket(caller_id: str, employee_id: str, category: str, subcategory: 
     return release_write("ticket", f"t:{employee_id}:{sid}:{category}:{conversation_id}", as_of, fn)
 
 
-def request_approval(caller_id: str, approval_id: str, conversation_id: str, as_of: str) -> dict:
-    """Dispatch an existing approval: needed -> pending. No new rows; never approves."""
-    if not (people.is_manager(caller_id) or _allowed_actor(caller_id, "")):
-        raise PermissionError(f"{caller_id} may not dispatch approvals")
-
+def request_approval(caller_id: str, approval_id: str, consent_id: str, conversation_id: str, as_of: str) -> dict:
+    """Dispatch an existing approval: needed -> pending. No new rows; never approves. Needs the caller's recorded
+    consent for the request's employee and system; the caller must be that employee, a manager, HR or IT."""
     def fn(c):
-        r = c.execute("SELECT status FROM approvals WHERE approval_id = ?", (approval_id,)).fetchone()
+        r = c.execute("SELECT a.status, a.request_id, q.employee_id, s.system_name FROM approvals a "
+                      "JOIN access_requests q ON a.request_id = q.request_id JOIN systems s ON q.system_id = s.system_id "
+                      "WHERE a.approval_id = ?", (approval_id,)).fetchone()
         if r is None:
             raise ValueError(f"no approval {approval_id!r}")
+        if not _allowed_actor(caller_id, r["employee_id"]):
+            raise PermissionError(f"{caller_id} may not dispatch approvals for {r['employee_id']}")
+        gate.check_consent(c, consent_id, caller_id, r["employee_id"], r["system_name"])
         if r["status"] == "needed":
             c.execute("UPDATE approvals SET status = 'pending' WHERE approval_id = ?", (approval_id,))
             ev = _next_id(c, "audit_log", "event_id", "EV")
@@ -182,3 +230,29 @@ def request_approval(caller_id: str, approval_id: str, conversation_id: str, as_
             return approval_id, {"status": "pending", "transitioned": True}
         return approval_id, {"status": r["status"], "transitioned": False}
     return release_write("approval_request", f"ap:{approval_id}:{conversation_id}", as_of, fn)
+
+
+def release_access(caller_id: str, request_id: str, consent_id: str, conversation_id: str, as_of: str) -> dict:
+    """Release an access request ONLY against recorded approvals: every approval row for it must already say
+    'approved' in the database. Moves the request to 'approved' (it does not assign a seat) and consumes the consent."""
+    def fn(c):
+        r = c.execute("SELECT q.employee_id, q.status, s.system_name FROM access_requests q "
+                      "JOIN systems s ON q.system_id = s.system_id WHERE q.request_id = ?", (request_id,)).fetchone()
+        if r is None:
+            raise ValueError(f"no access request {request_id!r}")
+        if not _allowed_actor(caller_id, r["employee_id"]):
+            raise PermissionError(f"{caller_id} may not release a request for {r['employee_id']}")
+        gate.check_consent(c, consent_id, caller_id, r["employee_id"], r["system_name"])
+        ok, rows = gate.approvals_recorded(c, request_id)
+        if not ok:
+            raise PermissionError(f"approvals not recorded as approved: {rows}")
+        if r["status"] != "approved":
+            c.execute("UPDATE access_requests SET status = 'approved', decision_reason = ? WHERE request_id = ?",
+                      ("Approvals recorded; seat not assigned.", request_id))
+            ev = _next_id(c, "audit_log", "event_id", "EV")
+            c.execute("INSERT INTO audit_log (event_id, entity_type, entity_id, event_type, actor_employee_id, "
+                      "created_at, notes) VALUES (?,?,?,?,?,?,?)",
+                      (ev, "access_request", request_id, "access_request_released", caller_id, as_of, conversation_id))
+        c.execute("UPDATE consents SET consumed = 1 WHERE message_id = ?", (consent_id,))
+        return request_id, {"status": "approved", "approvals": dict(rows)}
+    return release_write("access_release", f"rel:{request_id}:{conversation_id}", as_of, fn)
