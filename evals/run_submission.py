@@ -163,15 +163,18 @@ def main():
     ap.add_argument("--yaml", default=str(YAML))
     ap.add_argument("--fill", help="SUBMISSION.md to write trace ids into (only with --submit)")
     ap.add_argument("--no-verify", action="store_true")
+    ap.add_argument("--items", nargs="*", help="only these item ids (a partial run: never counted as the 27, never written to SUBMISSION.md)")
     a = ap.parse_args()
     turns = load(a.yaml)
     c = counts(turns)
     assert c == EXPECTED, f"expected {EXPECTED}, the yaml has {c}"
+    if a.items:
+        turns, a.fill = [t for t in turns if t["item"] in a.items], None
     print(f"{len(turns)} traces planned: {c}")
     env = "submission" if a.submit else "rehearsal"
     rows = dry_run(turns) if a.dry_run else live(turns, env, "" if a.submit else "rehearsal-")
     ids = {(r["item"], r["turn"]): r["trace_id"] for r in rows}
-    out = ROOT / "evals" / "results" / f"submission-{'dry' if a.dry_run else env}.json"
+    out = ROOT / "evals" / "results" / f"submission-{'dry' if a.dry_run else env}{'-partial' if a.items else ''}.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(rows, indent=1))
     if a.dry_run:

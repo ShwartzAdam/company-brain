@@ -118,6 +118,8 @@ def verdict(obs) -> tuple[str, list[str]]:
             u = g(o, "usage_details") or {}
             if not g(o, "model"):
                 f.append(f"generation {g(o, 'name')} has no model")
+            if str(g(o, "level")).endswith("ERROR"):
+                continue  # a failed call carries its reason, and Bedrock reports no usage for a malformed tool call
             if not (u.get("total") or u.get("input")):
                 f.append(f"generation {g(o, 'name')} has no usage")
     cls = next((o for o in obs if g(o, "name") == "classify"), None)

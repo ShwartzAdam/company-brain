@@ -1,0 +1,245 @@
+[
+ {
+  "item": "M-I-01",
+  "turn": null,
+  "thread": "rehearsal-M-I-01",
+  "trace_id": "e82f706b893e70749b012d8ba65036cc",
+  "status": "completed",
+  "request_id": "rehearsal-M-I-01:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-I-02",
+  "turn": null,
+  "thread": "rehearsal-M-I-02",
+  "trace_id": "0a50b9e6153c15a1722d6d28821feb98",
+  "status": "completed",
+  "request_id": "rehearsal-M-I-02:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-I-03",
+  "turn": null,
+  "thread": "rehearsal-M-I-03",
+  "trace_id": "3d7e770dc9623f2b767c9108143add10",
+  "status": "completed",
+  "request_id": "rehearsal-M-I-03:1",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 1,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "9752ee1db84d03e76708a256941b327c",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:1",
+  "intent": "employee_lookup"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 2,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "bb960cfcbce521e559234a9a60047c1b",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:2",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 3,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "d6cd0f7c56c7ccddf878b73cb9a990a2",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:3",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 4,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "8a69b46db3839874a4bd012067de5d9d",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:4",
+  "intent": "ticket_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 5,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "ff6f739463efd4b2fda87840f5d7bbb7",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:5",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 6,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "6f49cadfb6e2e3d0ad0134c80628a450",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:6",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 7,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "b5418acb26da86dbc9718248735da1b4",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:7",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 8,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "7ad4305efd93eccfd95b62325db0b71c",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:8",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 9,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "90e1c770a291d0752b3898b2da0eefa2",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:9",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 10,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "d494a9a92ac1b3af6be0fb35156b9d0b",
+  "status": "pending",
+  "request_id": "rehearsal-M-S-01:10",
+  "intent": "access_request"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 11,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "6f58666e00114ad16470e8caf6630122",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:11",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 12,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "4dd8015644adeb56d4ab598ec1c5949e",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:12",
+  "intent": "other"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 1,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "7af982ffce1b5afd427f132500a5cd30",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 2,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "0efe355bd4e810baabc695118ebcae12",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:2",
+  "intent": "other"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 3,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "76c45efc55bf4d9f94e93f28bade16b7",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:3",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 4,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "531d3c043b707e53fb5f6002144207e6",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:4",
+  "intent": "other"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 5,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "fe6944e9c5d1d9ea194c2b2ad1138d2d",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:5",
+  "intent": "equipment_request"
+ },
+ {
+  "item": "W-I-01",
+  "turn": null,
+  "thread": "rehearsal-W-I-01",
+  "trace_id": "7a71894d6974cbd623324cb085665349",
+  "status": "completed",
+  "request_id": "rehearsal-W-I-01:1",
+  "intent": "ticket_status"
+ },
+ {
+  "item": "W-I-02",
+  "turn": null,
+  "thread": "rehearsal-W-I-02",
+  "trace_id": "e1f2ac2d58c340da681d97fb57096f0d",
+  "status": "completed",
+  "request_id": "rehearsal-W-I-02:1",
+  "intent": "team_question"
+ },
+ {
+  "item": "W-I-03",
+  "turn": null,
+  "thread": "rehearsal-W-I-03",
+  "trace_id": "036e5738657fbaf4df35381f3fa653b9",
+  "status": "pending",
+  "request_id": "rehearsal-W-I-03:1",
+  "intent": "access_request"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 1,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "b54f1499108b71c49461da1e2b80f938",
+  "status": "completed",
+  "request_id": "rehearsal-W-S-01:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 2,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "4f92d792f77f30fa73c65586d6e112a9",
+  "status": "completed",
+  "request_id": "rehearsal-W-S-01:2",
+  "intent": "employee_lookup"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 3,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "bacc67030d50700707a5eb078d8e678a",
+  "status": "completed",
+  "request_id": "rehearsal-W-S-01:3",
+  "intent": "other"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 4,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "f97ef255ca31fe67e05ddf4e6ef8da53",
+  "status": "pending",
+  "request_id": "rehearsal-W-S-01:4",
+  "intent": "access_request"
+ }
+]

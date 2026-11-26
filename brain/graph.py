@@ -116,8 +116,18 @@ GATHER_SYSTEM = (
     "stop with done as soon as the question can be answered. Never call anything to file or approve.")
 
 
+def _shrink(result, limit: int = 1500):
+    """Cap a tool result near `limit` characters by shortening each row's `text`, never by cutting the JSON string:
+    a cut string once ended mid-`source` and the model cited '[documents/handbook/getting-.]'."""
+    if not isinstance(result, list) or len(json.dumps(result)) <= limit:
+        return result
+    cap = max(120, limit // max(1, len(result)) - 120)
+    return [{**r, "text": r["text"][:cap] + "..."} if isinstance(r, dict) and isinstance(r.get("text"), str) and len(r["text"]) > cap else r
+            for r in result]
+
+
 def _evidence_text(ev: list) -> str:
-    return "\n".join(f"[{i}] {e['tool']}({json.dumps(e['args'])}) -> {json.dumps(e['result'])[:1500]}"
+    return "\n".join(f"[{i}] {e['tool']}({json.dumps(e['args'])}) -> {json.dumps(_shrink(e['result']))[:3000]}"
                      for i, e in enumerate(ev, 1)) or "(none yet)"
 
 

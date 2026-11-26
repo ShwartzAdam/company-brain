@@ -1,0 +1,110 @@
+[
+ {
+  "item": "M-S-01",
+  "turn": 1,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "01b1c519e38644d8d6c7d389107591a5",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:1",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 2,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "aa2e4db2fbf6ff657ef82704ce89c301",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:2",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 3,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "c959b83af597f417fbb8136ccd26c6f6",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:3",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 4,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "3e769b80d644ee1a099b584a6c7da3e6",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:4",
+  "intent": "ticket_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 5,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "5cf1ee3838453d1a04b78832feb987b9",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:5",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 6,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "1c0bd50bed2db06862e41b597fd5fd99",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:6",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 7,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "8ba94e0bc04945b755515788022498a9",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:7",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 8,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "0031069c3bef3577272473366a721139",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:8",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 9,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "22fd5e298e9c221e08d91c9358826e59",
+  "status": "failed",
+  "request_id": "rehearsal-M-S-01:9",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 10,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "93e7179a737e7e08de555ce941c0707b",
+  "status": "pending",
+  "request_id": "rehearsal-M-S-01:10",
+  "intent": "access_request"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 11,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "202c5fa1ab7bafbbc5d1563206aa3fc7",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:11",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 12,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "f4db02c53cdcbc474944d0da6b72bfc3",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:12",
+  "intent": "other"
+ }
+]
