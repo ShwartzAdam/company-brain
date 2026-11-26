@@ -77,3 +77,25 @@ def test_variant_c_keeps_best_contract_and_policy(monkeypatch):
 
     out = retrieval.search("q", "E010", k=5, os_client=C())
     assert len(out) == 5 and {"7", "8"} <= set(out) and out[:3] == ["0", "1", "2"]
+
+
+def test_variant_c_corpus_is_a_preference_not_a_wall(monkeypatch):
+    """A model that asks for corpus=policies must still be able to receive the contract; audience stays hard."""
+    seen = {}
+    contract = _hit(7, "contracts")
+
+    def cand(query, caller, corpus, q):
+        seen["corpus"] = corpus
+        return [contract] + [_hit(i, "policies") for i in range(6)], []
+
+    monkeypatch.setenv("RETRIEVAL_VARIANT", "c")
+    monkeypatch.setattr(retrieval, "_doc_candidates", cand)
+    monkeypatch.setattr(retrieval, "rerank", lambda q, hits, n, chars=350: hits[:n])
+    monkeypatch.setattr(retrieval, "_result", lambda hits, *a: [h["_source"]["corpus"] for h in hits])
+
+    class C:
+        def search(self, **kw):
+            return {"hits": {"hits": [_hit(20, "policies")]}}
+
+    out = retrieval.search("q", "E010", k=3, corpus="policies", os_client=C())
+    assert seen["corpus"] is None and out[0] == "policies" and "contracts" in out

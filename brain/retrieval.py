@@ -154,7 +154,13 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
         r = os_client.search(index=config.INDEX_NAME, body=body)
         return r if raw else r["hits"]["hits"]
     if mode == "rerank" and os.getenv("RETRIEVAL_VARIANT", "c") == "c":
-        docs, must = _doc_candidates(query, caller_id, corpus, q)
+        # `corpus` is a preference here, not a wall: a model that guesses the wrong corpus must still reach the
+        # contract or policy that holds the answer. The audience filter stays in every query.
+        docs, must = _doc_candidates(query, caller_id, None, q)
+        if corpus:
+            pref = rrf([q(build_body(query, caller_id, POOL, corpus)), q(build_keyword_body(query, caller_id, POOL, corpus))])
+            seen = {d["_source"]["source"] for d in docs}
+            docs = ([p for p in pref[:10] if p["_source"]["source"] not in seen] + docs)[:POOL]
         hits = rerank(query, docs, k, chars=1200)
         have = {h["_source"]["source"] for h in hits}
         extra = [h for h in dict((m["_source"]["source"], m) for m in must).values()
@@ -167,6 +173,8 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
                 if h["_source"]["source"] not in fixed:
                     hits.remove(h)
             hits = hits + extra
+        if corpus:  # the requested corpus first, the rest after
+            hits = sorted(hits, key=lambda h: h["_source"].get("corpus") != corpus)
         return _result(hits, query, caller_id, mode, k, corpus)
     vec = q(build_body(query, caller_id, POOL if mode != "vector" else k, corpus))
     if mode == "vector":
