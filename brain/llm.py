@@ -90,7 +90,7 @@ def structured(messages: list[dict], system: str, schema: dict, name: str = "res
     """Schema-valid JSON or ValueError. Bedrock: forced tool call. A backend without `structured` (the test
     fakes) answers through complete() and the JSON is pulled from its text; the schema check is the same."""
     b, last = _get(), None
-    for _ in range(retries + 1):
+    for _ in range(retries + 1):  # `_` is the attempt number, recorded on the generation
         try:
             if hasattr(b, "structured"):
                 out = b.structured(messages, system, name, schema, max_tokens, temperature)
@@ -98,6 +98,7 @@ def structured(messages: list[dict], system: str, schema: dict, name: str = "res
                 out = _json_from_text(b.complete(messages, system, max_tokens, temperature))
             jsonschema.validate(out, schema)
             get_client().update_current_generation(
+                name=f"llm.structured:{name}", metadata={"attempts": _ + 1},
                 input=[{"role": "system", "content": system}] + messages, output=out, model=config.MODEL_ID,
                 model_parameters={"max_tokens": max_tokens, "temperature": temperature, "forced_tool": name},
                 usage_details=getattr(b, "last_usage", None))

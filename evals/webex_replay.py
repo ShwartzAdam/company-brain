@@ -26,10 +26,12 @@ sys.path.insert(0, str(ROOT))
 import checks  # noqa: E402
 import session_replay as sr  # noqa: E402
 import webex_checks as wc  # noqa: E402
+import judge  # noqa: E402
 
-from brain import agent, config, db  # noqa: E402
+from brain import agent, config, db, gate  # noqa: E402
 
-TABLES = ("tickets", "access_requests", "approvals", "audit_log", "write_keys")
+JUDGE = {"on": True}  # --no-judge turns the model-judged scores off (they cost a call each)
+TABLES = ("tickets", "access_requests", "approvals", "audit_log", "write_keys", "consents")
 SESSIONS = ["S4-constraint-carry", "S6-boundary-clean", "S7-boundary-noisy", "S8-boundary-heavy-noise"]
 
 
@@ -58,7 +60,7 @@ def run_case(c: dict, run: int, ck: Path) -> dict:
     db.reset_db()
     ck.unlink(missing_ok=True)
     before, tid = snap(), f"{c['id']}#{run}"
-    r = agent.handle_turn(c["caller"], c["group"], tid, c["message"], sr.AS_OF, checkpoint_path=ck)
+    r = agent.handle_turn(c["caller"], c["group"], tid, c["message"], sr.AS_OF, checkpoint_path=ck, case_id=c["id"], turn=1)
     calls = r.extra.get("tool_calls") or []
     fails = sr.check_turn(c, r.answer, r.tool_sequence, r.sources, calls)
     sc = checks.score_turn(c, calls, r.intent)
@@ -71,7 +73,13 @@ def run_case(c: dict, run: int, ck: Path) -> dict:
     fails += wc.check_never_granted(r.answer, dec, db.rows("SELECT status FROM access_requests WHERE request_id='AR001'")[0]["status"], approvals())
     fails += wc.check_status_agrees(r.status, r.answer)
     out = {"ok": not fails, "fails": fails, "intent": r.intent, "status": r.status, "tools": r.tool_sequence,
-           "scores": {k: v[0] for k, v in sc.items()}, "sources": r.sources, "answer_head": r.answer[:160], "error": r.error}
+           "scores": {k: v[0] for k, v in sc.items()}, "sources": r.sources, "answer_head": r.answer[:160], "error": r.error, "trace_id": r.trace_id}
+    if JUDGE["on"]:  # judged scores are diagnostics (uncalibrated until calibrate_judges passes), never part of `ok`
+        rec = {"tools": r.tool_sequence, "status": r.status, "extra": r.extra}
+        if "faithfulness" in judge.judges_for(rec):
+            out["scores"]["judge_faithfulness"] = judge.faithfulness([c["message"]], r.extra.get("evidence") or [], r.answer)[0]
+        if "overstates" in judge.judges_for(rec):
+            out["scores"]["judge_overstates"] = judge.overstates(r.answer, judge.truth_of(rec))[0]
     if c["id"] == "W-I-03":
         out["paused"] = bool(r.extra.get("paused"))
         first = snap()
@@ -114,7 +122,9 @@ def main():
     ap.add_argument("--only-cases", action="store_true")
     ap.add_argument("--session-ids", nargs="*", help="subset of the golden sessions to replay (default S4, S6, S7, S8)")
     ap.add_argument("--baseline")
+    ap.add_argument("--no-judge", action="store_true")
     a = ap.parse_args()
+    JUDGE["on"] = not a.no_judge
     from langfuse import get_client
     server = start_server()
     res: dict = {}
@@ -130,6 +140,7 @@ def main():
                     r = run_case(c, run, ck)
                     e["runs"] += 1
                     e["passes"] += r["ok"]
+                    e.setdefault("detail", []).append({"trace_id": r["trace_id"], "ok": r["ok"], "scores": r["scores"]})
                     e["fails"] = sorted(set(e["fails"]) | set(r["fails"]))
                     e["status"], e["tools"], e["sources"] = r["status"], r["tools"], r["sources"]
                     for k, v in r["scores"].items():
@@ -145,10 +156,13 @@ def main():
                     db.reset_db()
                     ck.unlink(missing_ok=True)
                     before = snap()
-                    for n, r in sr.run_session(gold[sid], run, ck, agent.handle_turn).items():
+                    go = next((t["n"] for t in gold[sid]["turns"] if gate.consent_from_message(t["user"])), None)
+                    hook = lambda t, r, b=before, g=go: wc.check_nofile_carry(b, snap(), t["n"], g)  # noqa: E731
+                    for n, r in sr.run_session(gold[sid], run, ck, agent.handle_turn, after_turn=hook).items():
                         e = agg.setdefault(n, {"runs": 0, "passes": 0, "fails": [], "tools": r["tools"], "status": r["status"]})
                         e["runs"] += 1
                         e["passes"] += r["ok"]
+                        e.setdefault("detail", []).append({"trace_id": r.get("trace_id", ""), "ok": r["ok"], "scores": r.get("scores") or {}})
                         e["fails"] = sorted(set(e["fails"]) | set(r["fails"]))
                     print(f"  {sid}#{run}: rows {before} -> {snap()}; consent rows {consent_rows()}")
                 res[sid] = agg

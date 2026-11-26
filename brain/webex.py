@@ -4,8 +4,10 @@ a model never decides what was done, and no field here can say access was grante
 from datetime import date
 from typing import Literal
 
+from langfuse import get_client
 from pydantic import BaseModel, Field, model_validator
 
+from brain import gate
 from brain.handoff import PendingAccessResult, WebexHandoff
 from brain.status import _GRANT, STATUSES
 
@@ -70,7 +72,9 @@ class WebexWorkflow:
         tickets = [t for t in await self._read("list_employee_tickets", employee_id=h.subject_employee_id)
                    if t.get("related_system_id") == ar["system_id"] and t["status"] not in ("closed", "resolved")]
         consent = (await self._read("record_consent", employee_id=h.subject_employee_id, system=h.system,
-                                    message_id=ctx["request_id"], draft=h.justification))[0]["consent_id"]
+                                    message_id=ctx["request_id"], draft=h.justification,
+                                    consent_token=gate.consent_token(self.box.caller_id, h.subject_employee_id, h.system,
+                                                                     ctx["request_id"], h.justification)))[0]["consent_id"]
         filed = (await self._read("create_access_request", employee_id=h.subject_employee_id, system=h.system,
                                   justification=h.justification, consent_id=consent))[0]
         actions = ([f"replay: request {filed['entity_id']} already recorded for this conversation, nothing new written"]
@@ -114,9 +118,17 @@ class WebexWorkflow:
 async def release_pending(box, pending: dict) -> dict:
     """Resume: read the recorded approval rows through MCP; release only when every one says approved.
     The server re-checks them inside the write, so a wrong answer here still cannot release."""
-    aps = [r for r in await box.call("read_approval", {"request_id": pending["request_id"]}) if isinstance(r, dict)]
-    status = {a["approval_id"]: a["status"] for a in aps}
-    if not aps or any(v != "approved" for v in status.values()):
-        return {"released": False, "approvals": status}
-    out = (await box.call("release_access", {"request_id": pending["request_id"], "consent_id": pending["consent_id"]}))[0]
-    return {"released": True, "approvals": status, "replayed": out.get("replayed", False), "request": out.get("entity_id")}
+    with get_client().start_as_current_observation(
+            name="approval_transition", as_type="span",
+            input={"request": pending["request_id"], "approval_ids": pending.get("approval_ids")},
+            metadata={"request_id": box.ctx.get("request_id"), "origin_request_id": pending.get("origin_request_id"),
+                      "phase": "release"}) as sp:
+        aps = [r for r in await box.call("read_approval", {"request_id": pending["request_id"]}) if isinstance(r, dict)]
+        status = {a["approval_id"]: a["status"] for a in aps}
+        if not aps or any(v != "approved" for v in status.values()):
+            sp.update(output={"released": False, "approvals": status, "transition": "none: still waiting"})
+            return {"released": False, "approvals": status}
+        out = (await box.call("release_access", {"request_id": pending["request_id"], "consent_id": pending["consent_id"]}))[0]
+        sp.update(output={"released": True, "approvals": status, "transition": "approved -> released to IT, no seat assigned",
+                          "replayed": out.get("replayed", False)})
+        return {"released": True, "approvals": status, "replayed": out.get("replayed", False), "request": out.get("entity_id")}

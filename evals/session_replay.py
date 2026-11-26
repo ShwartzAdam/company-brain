@@ -77,16 +77,19 @@ def compare(base: dict, new: dict) -> list:
     return out
 
 
-def run_session(s: dict, run: int, ck: Path, handle_turn) -> dict:
+def run_session(s: dict, run: int, ck: Path, handle_turn, after_turn=None) -> dict:
+    """after_turn(turn, result) -> list of extra failure strings (per-turn checks that need state outside the answer)."""
     caller = s.get("caller_id") or CALLERS[s["id"]][0]
     group = s.get("caller_group") or CALLERS[s["id"]][1]
     out = {}
     for t in s["turns"]:
-        r = handle_turn(caller, group, f"{s['id']}#{run}", t["user"], AS_OF, checkpoint_path=ck)
+        r = handle_turn(caller, group, f"{s['id']}#{run}", t["user"], AS_OF, checkpoint_path=ck,
+                        case_id=s["id"], turn=t["n"])
         fails = check_turn(t, r.answer, r.tool_sequence, r.sources, r.extra.get("tool_calls"))
+        fails += (after_turn(t, r) if after_turn else [])
         sc = checks.score_turn(t, r.extra.get("tool_calls") or [], r.intent)  # lesson 11 diagnostics, not part of ok
         out[str(t["n"])] = {"ok": not fails, "fails": fails, "tools": r.tool_sequence, "status": r.status,
-                            "intent": r.intent, "scores": {k: v[0] for k, v in sc.items()}}
+                            "intent": r.intent, "scores": {k: v[0] for k, v in sc.items()}, "trace_id": r.trace_id}
         print(f"{s['id']}#{run} t{t['n']} {'FAIL' if fails else 'ok  '} intent={r.intent} status={r.status} "
               f"tools={r.tool_sequence} {fails or ''}")
     return out
@@ -121,6 +124,7 @@ def main():
                 e = agg.setdefault(n, {"runs": 0, "passes": 0, "fails": [], "tools": r["tools"], "status": r["status"]})
                 e["runs"] += 1
                 e["passes"] += r["ok"]
+                e.setdefault("detail", []).append({"trace_id": r.get("trace_id", ""), "ok": r["ok"], "scores": r.get("scores") or {}})
                 for k, v in (r.get("scores") or {}).items():  # mean per diagnostic across runs
                     m = e.setdefault("scores", {}).setdefault(k, [0.0, 0])
                     m[0] += v

@@ -44,6 +44,7 @@ class State(TypedDict, total=False):
     error: str
     status: str
     answer: str
+    fallbacks: list       # silent degradations that fired this turn (classify default plan, gather gave up)
 
 
 def _union(old, new):
@@ -58,14 +59,29 @@ def _meta(**kw):
     get_client().update_current_span(metadata=kw)
 
 
-@observe(name="classify")
+def _io(inp, out, **kw):
+    """Compact input/output for a node span: what went in and what came out, not the whole state."""
+    get_client().update_current_span(input=inp, output=out, metadata=kw or None)
+
+
+def _node(name):
+    return observe(name=name, capture_input=False, capture_output=False)
+
+
+@_node("classify")
 async def classify(state: State, config) -> dict:
     msgs = classify_prompt(_window(state), state["message"], state.get("facts"), state.get("constraints"))
+    fallbacks = []
     try:
         plan = parse_plan(llm.structured(msgs, CLASSIFY_SYSTEM, PLAN_SCHEMA, name="classify", max_tokens=500))
-    except ValueError:  # no valid plan twice: fail open for reads only
+    except ValueError as e:  # no valid plan twice: fail open for reads only, and SAY SO in the trace
         plan = TurnPlan()
-    _meta(intent=plan.intent, requires_tools=plan.requires_tools, refuse=plan.refuse)
+        fallbacks.append("classify_default_plan")
+        get_client().update_current_span(level="WARNING", status_message=f"classify fell back to the default plan: {e}"[:300])
+    _io({"message": state["message"][:300], "constraints": state.get("constraints")},
+        {"intent": plan.intent, "requires_tools": plan.requires_tools, "lookups_needed": plan.lookups_needed,
+         "system": plan.system_name, "subject": plan.subject_name, "closes_topic": plan.closes_topic, "refuse": plan.refuse},
+        classify_fallback=bool(fallbacks))
     facts, closed = list(state.get("facts") or []), [c for c in state.get("closed") or [] if c != plan.intent]
     if plan.closes_topic:  # the model proposes, code applies: drop the last topic's rows, keep one decision line
         prev = next((m.get("intent") for m in reversed(state.get("messages") or []) if m["role"] == "user"), None)
@@ -78,13 +94,15 @@ async def classify(state: State, config) -> dict:
         facts.append(f"decision: closed - {plan.closes_topic}")
     return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "decision": None, "pause_now": False, "checklist": None, "facts": _union(facts, plan.relevant_facts),
             "constraints": _union(state.get("constraints"), plan.relevant_constraints),
-            "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": []}
+            "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": [],
+            "fallbacks": fallbacks}
 
 
-@observe(name="scope")
+@_node("scope")
 async def scope(state: State, config) -> dict:
     scope_name, visible = select_tools(TurnPlan(**state["plan"]), gate_open=False)
-    _meta(scope=scope_name, visible_tools=visible, write_tools_visible=[t for t in visible if t in WRITE_TOOLS])
+    _io({"intent": state["plan"]["intent"], "requires_tools": state["plan"].get("requires_tools")},
+        {"scope": scope_name, "visible_tools": visible}, write_tools_visible=[t for t in visible if t in WRITE_TOOLS])
     return {"scope": scope_name, "visible": visible}
 
 
@@ -111,12 +129,13 @@ def _sources(result) -> list[str]:
     return out
 
 
-@observe(name="gather")
+@_node("gather")
 async def gather(state: State, config) -> dict:
     box = config["configurable"]["toolbox"]
     visible, ev, log, srcs = state["visible"], list(state["evidence"]), list(state["tool_log"]), list(state["sources"])
     error = ""
     bad = 0
+    fallbacks = list(state.get("fallbacks") or [])
     needed, nudged = TurnPlan(**state["plan"]).lookups_needed, False
     for _ in range(MAX_STEPS):
         user = (f"Caller employee id (use it ONLY for 'me'/'my'; any other person needs their own lookup): {box.caller_id}\n"
@@ -132,6 +151,7 @@ async def gather(state: State, config) -> dict:
             bad += 1
             if bad > 1:
                 error = "model did not return a valid action"
+                fallbacks.append("gather_gave_up")
                 break
             continue
         if act.get("done") or not act.get("tool"):
@@ -153,16 +173,12 @@ async def gather(state: State, config) -> dict:
             continue
         if any(e["tool"] == name and e["args"] == args for e in ev):  # a repeat call means the model is looping
             break
-        with get_client().start_as_current_observation(name=f"tool.{name}", as_type="tool",
-                                                        input={"args": args}) as sp:
-            try:
-                res = await box.call(name, args)
-            except Exception as e:  # noqa: BLE001
-                error = f"{name} failed: {e}"
-                sp.update(level="ERROR", status_message=error)
-                break
-            found = _sources(res)
-            sp.update(output={"sources": found, "n": len(res)}, metadata={"request_id": config["configurable"]["request_id"]})
+        try:
+            res = await box.call(name, args)  # the tool.<name> span is opened inside Toolbox.call
+        except Exception as e:  # noqa: BLE001
+            error = f"{name} failed: {e}"
+            break
+        found = _sources(res)
         log.append({"tool": name, "args": args})
         ev.append({"tool": name, "args": args, "result": res})
         srcs += found
@@ -177,9 +193,12 @@ async def gather(state: State, config) -> dict:
             srcs += _sources(res)
         except Exception as e:  # noqa: BLE001
             error = f"search_documents failed: {e}"
-    _meta(tool_sequence=[t["tool"] for t in log], rejected=[t["tool"] for t in log if t.get("rejected")],
-          sources=sorted(set(srcs)), error=error)
-    return {"evidence": ev, "tool_log": log, "sources": sorted(set(srcs)), "error": error}
+    _io({"visible_tools": visible, "lookups_needed": needed},
+        {"tool_sequence": [t["tool"] for t in log], "rejected": [t["tool"] for t in log if t.get("rejected")],
+         "sources": sorted(set(srcs)), "error": error}, nudged=nudged)
+    if error:
+        get_client().update_current_span(level="ERROR", status_message=error[:300])
+    return {"evidence": ev, "tool_log": log, "sources": sorted(set(srcs)), "error": error, "fallbacks": fallbacks}
 
 
 def after_gather(state: State) -> str:
@@ -190,11 +209,11 @@ def after_gather(state: State) -> str:
     return "handoff" if plan.intent == "access_request" and not state["error"] else "answer"
 
 
-@observe(name="rearm")
+@_node("rearm")
 async def rearm(state: State, config) -> dict:
     """The plan said a lookup was needed and none ran: widen to every READ tool, once. Never adds a write."""
     wide = widen_reads(state["visible"])
-    _meta(visible_tools=wide)
+    _io({"visible_tools": state["visible"], "reason": "plan required a lookup and none ran"}, {"visible_tools": wide})
     return {"visible": wide, "rearmed": True}
 
 
@@ -212,7 +231,7 @@ def _employees(state: State) -> dict:
     return seen
 
 
-@observe(name="handoff")
+@_node("handoff")
 async def handoff(state: State, config) -> dict:
     """Maya proposes, never files. On an explicit ask to act, code builds ONE typed handoff for the Webex side.
     The subject is matched by exact full name against employees already seen, so Maya Cohen is never Maya Rosen."""
@@ -227,7 +246,16 @@ async def handoff(state: State, config) -> dict:
     # person only if it reads like a name (capitalised) and is not the caller's own. A heuristic, tested.
     about_me = not subj or subj.lower() in ("user", "me", "myself", "i", "caller", "requester", me, caller.lower()) or not subj[:1].isupper()
     mine = (about_me and gate.self_request(state["message"]) and not gate.blocks_filing(state.get("constraints")))
-    if plan.intent != "access_request" or not (gate.consent_from_message(state["message"]) or mine):
+    explicit = gate.consent_from_message(state["message"])
+    if plan.intent == "access_request":  # why a write may or may not follow, visible without reading the regexes
+        with get_client().start_as_current_observation(name="consent_decision", as_type="guardrail",
+                                                        input={"top_level_text": gate.top_level(state["message"])[:300]}) as sp:
+            sp.update(output={"consent": bool(explicit or mine), "explicit_go_ahead": explicit, "self_request": mine,
+                              "no_file_rule_in_force": gate.blocks_filing(state.get("constraints")), "about_caller": about_me,
+                              "rule": "explicit go-ahead in own words" if explicit else ("own request, no do-not-file rule" if mine else "none")},
+                      metadata={"request_id": cfg["request_id"], "method": "regex heuristic"})
+    if plan.intent != "access_request" or not (explicit or mine):
+        _io({"intent": plan.intent}, {"handoff": None}, reason="no consent for a handoff on this turn")
         return {"handoff": None}
     seen = _employees(state)
     if not (mine and not gate.consent_from_message(state["message"])) and subj and not any(n.lower() == subj.lower() for n in seen.values()):
@@ -238,7 +266,8 @@ async def handoff(state: State, config) -> dict:
     ids = [caller] if mine and not gate.consent_from_message(state["message"]) else [
         i for i, n in seen.items() if plan.subject_name and n.lower() == plan.subject_name.lower()]
     if len(ids) != 1 or not plan.system_name.strip():
-        _meta(handoff="not made", matches=ids, system=plan.system_name)
+        _io({"subject": plan.subject_name, "system": plan.system_name}, {"handoff": None},
+            reason="subject did not resolve to exactly one employee or no system", matches=ids)
         return {"handoff": None}
     h = WebexHandoff(subject_employee_id=ids[0], system=plan.system_name.strip(),
                      justification=f"Requested by {cfg['toolbox'].caller_id}: {gate.top_level(state['message']).strip()[:200]}",
@@ -254,9 +283,11 @@ async def handoff(state: State, config) -> dict:
         made[h.idempotency_key] = {**h.model_dump(), "result": res.model_dump()}
         calls += 1
         if res.pending:
-            pend[res.pending["request_id"]] = res.pending
+            pend[res.pending["request_id"]] = {**res.pending, "origin_request_id": cfg["request_id"],
+                                               "origin_trace_id": cfg["toolbox"].ctx.get("trace_id", "")}
             pause_now = True
-    _meta(handoff=made[h.idempotency_key], handoff_calls=calls)
+    _io({"subject": h.subject_employee_id, "system": h.system, "key": h.idempotency_key},
+        {"handoff_made": True, "replayed": h.idempotency_key in (state.get("handoffs") or {}), "pause": pause_now}, handoff_calls=calls)
     dec = made[h.idempotency_key]["result"].get("decision")
     ev, srcs = list(state.get("evidence") or []), list(state.get("sources") or [])
     if dec and dec.get("observed_facts"):  # what the workflow read is evidence too, so every citation is traceable
@@ -295,7 +326,7 @@ def _row_facts(evidence: list) -> list[str]:
     return out
 
 
-@observe(name="answer")
+@_node("answer")
 async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
     status = final_status(error=bool(state["error"]), clarify=plan.intent == "ambiguous", refuse=plan.refuse,
@@ -314,6 +345,7 @@ async def answer(state: State, config) -> dict:
         text = llm.complete([{"role": "user", "content": body}], ANSWER_SYSTEM.format(status=status), max_tokens=700)
     h = state.get("handoff")
     if not answer_agrees(status, text):
+        get_client().update_current_span(level="WARNING", status_message="answer disagreed with status: rewritten by code")
         _meta(guard_rewrote_answer=True, original_answer=text[:400])
         text = ("I have not filed or granted anything. That would need the caller's explicit go-ahead "
                 "and the recorded approvals first.")
@@ -324,7 +356,7 @@ async def answer(state: State, config) -> dict:
         d = AccessDecision(**dec)
         status = d.status
         text += " " + d.render()
-    _meta(status=status)
+    _io({"evidence_items": len(state["evidence"]), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(state["evidence"])
     return {"answer": text, "status": status, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
@@ -332,24 +364,30 @@ async def answer(state: State, config) -> dict:
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 
 
-@observe(name="pause")
 async def pause(state: State, config) -> dict:
     """The durable pause (lesson 9). Approvals were dispatched this turn: persist and stop here. Whatever value
-    resumes this node is ignored: only the approval rows, re-read through MCP, decide whether anything is released."""
+    resumes this node is ignored: only the approval rows, re-read through MCP, decide whether anything is released.
+    The interrupt is an exception to the tracer, which would mark this span ERROR; a pause is a normal outcome."""
     if not state.get("pause_now"):
+        with get_client().start_as_current_observation(name="pause", as_type="span", input={"pause_now": False}) as sp:
+            sp.update(output={"paused": False})
         return {}
+    lf = get_client()
+    with lf.start_as_current_observation(name="pause", as_type="span", input={"pending": list(state["pending"])}) as sp:
+        sp.update(output={"paused": True, "waiting_on": "recorded approval rows"})
     interrupt({"pending": list(state["pending"]), "message": "waiting for recorded approvals"})
     box = config["configurable"]["toolbox"]
-    pend, notes = dict(state["pending"]), []
-    for rid, p in pend.items():
-        if p["released"]:
-            continue
-        r = await release_pending(box, p)
-        if r["released"]:
-            pend[rid] = {**p, "released": True}
-        notes.append(resume_text(rid, r))
-    text = " ".join(notes)
-    _meta(resumed=True, released=[k for k, v in pend.items() if v["released"]])
+    with lf.start_as_current_observation(name="pause.resume", as_type="span", input={"pending": list(state["pending"])}) as sp:
+        pend, notes = dict(state["pending"]), []
+        for rid, p in pend.items():
+            if p["released"]:
+                continue
+            r = await release_pending(box, p)
+            if r["released"]:
+                pend[rid] = {**p, "released": True}
+            notes.append(resume_text(rid, r))
+        text = " ".join(notes)
+        sp.update(output={"released": [k for k, v in pend.items() if v["released"]], "answer": text[:300]})
     return {"pending": pend, "answer": text, "status": "needs_human" if all(v["released"] for v in pend.values()) else "pending",
             "messages": [{"role": "assistant", "content": text}]}
 

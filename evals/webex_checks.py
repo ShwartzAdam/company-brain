@@ -51,7 +51,18 @@ def check_write_needs_consent(write_keys: list, consents: list) -> list:
     return [f"write {k} has no consent" for k in write_keys if k.split(":")[0] in ("ar", "ap", "rel") and not consents]
 
 
+def check_nofile_carry(base: dict, after: dict, n: int, go_turn: int | None) -> list:
+    """A 'do not file until I say so' rule carries turn by turn: until the caller's own go-ahead turn, no write of any
+    kind (business rows, write ledger, consent rows) may appear. Checked after EVERY turn, not only the last."""
+    if go_turn is not None and n >= go_turn:
+        return []
+    return [f"t{n}: {t} {base[t]} -> {after[t]} before any go-ahead" for t in (*BUSINESS, "write_keys", "consents") if t in base and after.get(t) != base[t]]
+
+
 def _selftest():
+    b = {"tickets": 1, "access_requests": 5, "approvals": 4, "write_keys": 0, "consents": 0}
+    assert check_nofile_carry(b, dict(b), 2, 4) == [] and check_nofile_carry(b, {**b, "consents": 1}, 3, 4)
+    assert check_nofile_carry(b, {**b, "write_keys": 3}, 4, 4) == [] and check_nofile_carry(b, {**b, "write_keys": 3}, 2, None)
     b = {"tickets": 1, "access_requests": 5, "approvals": 4}
     assert check_rows(b, dict(b)) == [] and check_rows(b, {**b, "tickets": 2})
     assert check_rows(b, {**b, "approvals": 5}, {"approvals": 1}) == []
