@@ -95,7 +95,7 @@ Not done: the LLM judge for Webex answers ("overstates what was done"), the per-
 
 ## Step 5: Observability and evals
 
-Verified offline: `pytest` 105 green (fake model, in-memory MCP). Also verified against the real Langfuse project with a fake model and no Bedrock: two smoke traces (a paused Webex turn and its resume) were read back through the v2 API and checked. **Not done yet:** any live Bedrock replay on this code, the Langfuse model price definition (cost shows empty until it exists), judge calibration (`evals/calibrate_judges.py`), and the diagnosis of the open Step 3/4 failures (they need traces from a live run).
+Verified: `pytest` 106 green offline (fake model, in-memory MCP). Live (Bedrock + Langfuse, `environment=rehearsal`): W-I-03 passes including replay on the same and a new thread, pause, and resume before and after approval; the full 27-trace set (`python evals/run_submission.py --rehearsal`) was run once and read back through the v2 API: 25 traces followable on the first run, the 2 failures were diagnosed from their traces (below), and M-S-01 was re-run after the fixes (all followable). The other 15 traces were not re-run after the fixes. **Not done:** the Langfuse model price definition (cost shows empty until it exists), judge calibration (`evals/calibrate_judges.py`) and any live judge run, the 3-run replays of the golden sessions on this code, and the instructor invite (#9).
 
 ### Reading a trace (no code needed)
 One turn = one trace, root `agent.turn` (type AGENT), grouped into its conversation by `session_id` = thread id, `user_id` = caller.
@@ -129,3 +129,11 @@ agent.resume          its own trace; metadata resume_of = the paused turn's requ
 ### Changed in the product code (instrumentation, plus two behaviour changes)
 - Behaviour: `get_employee` accepts a near-exact full name ("rrachel stein" returned nothing before; "Maya" stays ambiguous). `record_consent` now needs an HMAC minted from `CONSENT_SECRET` (set it in `.env`, same value for the app and the server), so a client with raw MCP access cannot create consent; the regex consent heuristic itself is unchanged.
 - `write_keys` gained `request_id` and `trace_id`; older databases get the columns on first open.
+
+### What the rehearsal found (known limits, not fixed in Step 5)
+Read by hand against `KNOWN-TRAPS.md`; stage attribution comes from the traces (classify output, gather tool sequence). These are Maya answer-quality limits from Step 3, now visible and measurable. They are the next work item, not part of Step 5.
+- **Gather stops before a document search** (M-I-03 "eligible for remote equipment?", M-S-01 t2 "what does the offer letter say?"): classify listed the right lookups, gather ran only database tools and ended. The one-time nudge counts calls, not whether a document lookup happened. Answers were wrong (M-I-03 said not eligible; the trap list says eligible) or "cannot determine".
+- **Classify says `requires_tools=false` and answers from memory** (M-S-01 t6 headset, t9 Finance): the answers say "no headset" and "the freeze blocks it, Finance is not the issue"; the trap list says the freeze threshold applies to the increment and Finance approval is still required for an expansion.
+- **Numbered citation `[1]`** on M-S-01 t8 and a non-manager asking about the manager's guide (M-S-02 t4) gets handbook text without being told the guide is restricted.
+- **Classify's forced tool call can come back `malformed_tool_use`** on long prompts (M-S-01 t12 "write the full status summary", M-S-02 t4). It is retried twice with a small temperature bump; M-S-01 t12 still fell back to the default plan. The fallback is flagged in the trace (`fallbacks: classify_default_plan`, WARNING span) and the answer is still produced. Candidate fix: retry that failure in plain JSON mode.
+- Not diagnosed: W-I-02 (passed in the rehearsal, 1/3 in Step 4), S6/S7/S8 turns 1-3 (need the 3-run replay). The typo cause of the missing `E010` ("rrachel stein") is fixed and tested.
