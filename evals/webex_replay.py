@@ -87,7 +87,8 @@ def run_case(c: dict, run: int, ck: Path) -> dict:
         out["fails"] += wc.check_replay(first, snap())              # nothing at all changes, not even the write ledger
         agent.handle_turn(c["caller"], c["group"], tid + "-new", c["message"], sr.AS_OF, checkpoint_path=ck)  # replay, new thread
         now = snap()                                                # a new conversation adds ledger keys, never business rows
-        out["fails"] += wc.check_replay({k: v for k, v in first.items() if k != "write_keys"}, {k: v for k, v in now.items() if k != "write_keys"})
+        LEDGERS = ("write_keys", "consents")  # a new conversation adds ledger rows, never business rows
+        out["fails"] += wc.check_replay({k: v for k, v in first.items() if k not in LEDGERS}, {k: v for k, v in now.items() if k not in LEDGERS})
         first = now
         if not out["paused"]:
             out["fails"].append("did not pause")
