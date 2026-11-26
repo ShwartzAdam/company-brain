@@ -42,7 +42,8 @@ class BedrockBackend:
         for block in r["output"]["message"]["content"]:
             if "toolUse" in block:
                 return block["toolUse"]["input"]
-        raise ValueError("model returned no tool call")
+        text = " ".join(b.get("text", "") for b in r["output"]["message"]["content"])[:200]
+        raise ValueError(f"model returned no tool call (stopReason={r.get('stopReason')}, text={text!r})")
 
     def embed(self, text):
         r = self._c.invoke_model(
@@ -86,25 +87,31 @@ def _json_from_text(text: str) -> dict:
 
 @observe(as_type="generation", name="llm.structured", capture_input=False, capture_output=False)
 def structured(messages: list[dict], system: str, schema: dict, name: str = "result", max_tokens: int = 500,
-               temperature: float = 0.0, retries: int = 1) -> dict:
+               temperature: float = 0.0, retries: int = 2) -> dict:
     """Schema-valid JSON or ValueError. Bedrock: forced tool call. A backend without `structured` (the test
     fakes) answers through complete() and the JSON is pulled from its text; the schema check is the same."""
     b, last = _get(), None
-    for _ in range(retries + 1):
+    for _ in range(retries + 1):  # `_` is the attempt number, recorded on the generation
         try:
             if hasattr(b, "structured"):
-                out = b.structured(messages, system, name, schema, max_tokens, temperature)
+                out = b.structured(messages, system, name, schema, max_tokens, min(0.3, temperature + 0.15 * _))  # a malformed forced call repeats at temperature 0
             else:
                 out = _json_from_text(b.complete(messages, system, max_tokens, temperature))
             jsonschema.validate(out, schema)
             get_client().update_current_generation(
+                name=f"llm.structured:{name}", metadata={"attempts": _ + 1},
                 input=[{"role": "system", "content": system}] + messages, output=out, model=config.MODEL_ID,
                 model_parameters={"max_tokens": max_tokens, "temperature": temperature, "forced_tool": name},
                 usage_details=getattr(b, "last_usage", None))
             return out
         except (ValueError, jsonschema.ValidationError) as e:  # retry only output problems, not API errors
             last = e
-    raise ValueError(f"no valid {name}: {str(last)[:160]}")
+    # a failed call is still a generation a reader must be able to see: named, with model, usage and the reason
+    get_client().update_current_generation(
+        name=f"llm.structured:{name}", level="ERROR", status_message=f"no valid {name}: {str(last)[:300]}",
+        metadata={"attempts": retries + 1}, input=[{"role": "system", "content": system}] + messages, model=config.MODEL_ID,
+        usage_details=getattr(b, "last_usage", None))
+    raise ValueError(f"no valid {name}: {str(last)[:300]}")
 
 
 def embed(text: str) -> list[float]:

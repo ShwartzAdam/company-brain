@@ -3,6 +3,7 @@ caller_id is injected here from the application's argument, whatever the model w
 import contextlib
 import json
 
+from langfuse import get_client
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
@@ -45,11 +46,23 @@ class Toolbox:
         for k in ("as_of", "conversation_id"):  # overwrite whatever the model wrote
             if k in props and k in self.ctx:
                 args[k] = self.ctx[k]
-        res = await self.s.call_tool(name, args)
-        if res.isError:
-            raise RuntimeError(" ".join(getattr(c, "text", "") for c in res.content)[:300])
-        parts = [json.loads(c.text) for c in res.content if getattr(c, "text", None)]
-        return parts
+        lf = get_client()
+        meta = {"request_id": self.ctx.get("request_id")}
+        shown = {k: ("<redacted>" if "token" in k else v) for k, v in args.items()}  # a consent token never enters a trace
+        with lf.start_as_current_observation(name=f"tool.{name}", as_type="tool", input={"args": shown},
+                                             metadata={**meta, "caller_id": self.caller_id}) as sp:
+            # the server reads these and opens server.<tool> under THIS span, in the same trace
+            meta |= {"trace_id": lf.get_current_trace_id(), "parent_span_id": lf.get_current_observation_id()}
+            try:
+                res = await self.s.call_tool(name, args, meta={k: v for k, v in meta.items() if v})
+                if res.isError:
+                    raise RuntimeError(" ".join(getattr(c, "text", "") for c in res.content)[:300])
+            except Exception as e:
+                sp.update(level="ERROR", status_message=str(e)[:300])
+                raise
+            parts = [json.loads(c.text) for c in res.content if getattr(c, "text", None)]
+            sp.update(output={"sources": [p["source"] for p in parts if isinstance(p, dict) and p.get("source")], "n": len(parts)})
+            return parts
 
 
 @contextlib.asynccontextmanager

@@ -1,6 +1,6 @@
 # Company Brain (NovaOps final project)
 
-Status: Steps 1-2 built: foundation, hybrid retrieval, and the agent loop (classify, scope, gather, answer) with a write gate that releases nothing yet. Nothing below is claimed unless it exists in this repo.
+Status: Steps 1-4 built (foundation and retrieval, agent loop, Maya, Webex) and Step 5 (observability and evals) built and verified offline; its live evaluation has not been run yet. Nothing below is claimed unless it exists in this repo.
 
 ## Stack
 - Python 3.12, venv, `requirements.txt`
@@ -36,7 +36,7 @@ python evals/retrieval_check.py && python evals/leak_check.py
 pytest
 ```
 
-## Tracing (Langfuse)
+## Tracing (Langfuse): Step 1 notes, superseded by "Step 5" below
 `llm.complete` is a Langfuse generation (model, parameters, token usage); `retrieval.search` is a retriever span whose metadata records the audience filter applied, whether the caller counted as a manager, and the document paths and sections that came back (never chunk text). The rerank call nests under the search. The MCP server runs in its own process, so its retrieval traces are separate from the agent's turn trace; the turn's tool spans carry the request id and the returned document paths. Tests set `LANGFUSE_TRACING_ENABLED=false`.
 
 ## Decisions
@@ -91,3 +91,49 @@ Not done: the LLM judge for Webex answers ("overstates what was done"), the per-
 - 102 documents, 740 chunks indexed. `evals/leak_check.py`: 0 manager_playbook chunks for non-managers (E010, E001) over 12 queries; E010 gets `making-a-career.md`; E018 reaches the playbook.
 - Retrieval: vector + BM25 (30 candidates each), fused by reciprocal rank, reranked by Nova to 5. The audience filter is in both queries; the reranker only sees filtered chunks. `evals/retrieval_check.py` scores documents only (database tables are not retrievable here; three cases need the agent's second search and are listed, not scored). Mean recall@5, 5 `retrieval_expectations` / 16 `single_turn_cases`, one run on the first index build: vector 0.53 / 0.71, hybrid 0.60 / 0.62, hybrid + rerank 0.70 / 0.89. After an index rebuild, hybrid + rerank over 5 runs (`--runs 5`) is 0.80 / 0.80 (sd 0.01-0.02): scores differ between index builds, so compare only on one index. Reserving 2 result slots for the best policy chunks (policy-only search, model-picked, same audience filter) fixes the access-policy misses (SIMPLE_013/014: 0.00 -> 0.50) at the cost of Webex cases: 0.74 / 0.83 on 3 runs; overall mean over the 21 cases is about 0.81 vs 0.80 before. A pool of 50 was worse (0.68 / 0.79), so 30 stays. Remaining misses are general policies (`access_management_policy`, `onboarding_policy`) outranked by person- or product-specific files; the agent loop's follow-up searches are the next lever. `evals/diagnose.py` shows each miss's rank.
 - S1-quick-policy turn 1 via `scripts/ask.py --caller E010`: answers "five business days" with a cited `policies/equipment_policy.md`.
+
+
+## Step 5: Observability and evals
+
+Verified: `pytest` 106 green offline (fake model, in-memory MCP). Live (Bedrock + Langfuse, `environment=rehearsal`): W-I-03 passes including replay on the same and a new thread, pause, and resume before and after approval; the full 27-trace set (`python evals/run_submission.py --rehearsal`) was run once and read back through the v2 API: 25 traces followable on the first run, the 2 failures were diagnosed from their traces (below), and M-S-01 was re-run after the fixes (all followable). The other 15 traces were not re-run after the fixes. **Not done:** the Langfuse model price definition (cost shows empty until it exists), judge calibration (`evals/calibrate_judges.py`) and any live judge run, the 3-run replays of the golden sessions on this code, and the instructor invite (#9).
+
+### Reading a trace (no code needed)
+One turn = one trace, root `agent.turn` (type AGENT), grouped into its conversation by `session_id` = thread id, `user_id` = caller.
+```
+agent.turn            input: the message; output: the answer
+                      metadata: caller_id, caller_group, scope, intent, visible_tools, tool_sequence, status, request_id,
+                                case_id, turn, as_of, paused, fallbacks, trajectory (calls + truncated results)
+  classify            input message -> output intent, requires_tools, lookups_needed; classify_fallback flag
+    llm.structured:classify     (generation: model, usage)
+  scope               intent -> scope + visible tools (write_tools_visible)
+  gather              tool_sequence, rejected calls, error
+    llm.structured:action  /  tool.<name>  ->  server.<name>   (the MCP server's own span, same trace)
+  rearm               only when a required lookup never ran
+  handoff             consent_decision (why a write may follow), approval_transition (needed -> pending), tool.* writes
+  answer              status and the answer; WARNING when code rewrote an answer that disagreed with the status
+  pause / pause.resume   a pause is a normal outcome (not an ERROR)
+agent.resume          its own trace; metadata resume_of = the paused turn's request_id, origin_trace_id = that turn's trace
+  approval_transition (release): approval rows before, released or not
+```
+- **Request id** `<thread>:<n>` is on the root, every `tool.*` and `server.*` span, and, through the MCP call metadata, on every write row (`write_keys.request_id` and `trace_id`). A resume keeps the paused turn's id.
+- **Silent degradations are flagged**, not hidden: a classify default plan or a gather that gave up shows in `fallbacks` and as a WARNING span.
+- `status` is exactly one of completed, blocked, pending, needs_human, failed, and `evals/trace_checks.py` fails a trace whose answer disagrees with it.
+- Not in the trace: restricted document text for a non-manager (filtered at retrieval); consent tokens (redacted).
+
+### Checks (`evals/`)
+- Deterministic, offline: `checks.py` (intent accuracy, tool necessity and selection, forbidden tools, efficiency, `fact_stage` = which stage lost a missed fact), `webex_checks.py` (rows, reuse, replay, never-granted, status agrees, write needs consent, **no-file rule carried turn by turn**), `maya_checks.py`, and **`trace_checks.py`** (is this trace followable: required metadata, node order, tool spans with the same request id, a server span under every write, write order, Maya's scope with no write span, model and usage on every generation, resume linked). `INVALID` means the trace is not fully readable yet; it is never scored low.
+- Judges, through `llm.py` with a forced schema (`judge.py`): `faithfulness` and `overstates` (claims something was filed, approved, granted or released that code did not record; a status-regex floor makes the proven cases 0 without a model). They are diagnostics and are not part of any pass until `python evals/calibrate_judges.py` separates the hand-written good and bad cases.
+- Scoring from outside: `evals/score_traces.py results.json` reads each turn's trace back (v2 observations API; the v3 trace API was removed 2026-11-16), runs `trace_checks`, and pushes scores (`trace_followable`, `turn_pass`, each diagnostic) onto the trace. The replays now store each run's `trace_id`.
+- Submission run: `evals/run_submission.py --dry-run` proves the 27-trace plan (Maya 20, Webex 7), threads, groups and the table fill with no AWS; `--rehearsal` and `--submit` are live and refuse to start when Langfuse rejects the keys.
+
+### Changed in the product code (instrumentation, plus two behaviour changes)
+- Behaviour: `get_employee` accepts a near-exact full name ("rrachel stein" returned nothing before; "Maya" stays ambiguous). `record_consent` now needs an HMAC minted from `CONSENT_SECRET` (set it in `.env`, same value for the app and the server), so a client with raw MCP access cannot create consent; the regex consent heuristic itself is unchanged.
+- `write_keys` gained `request_id` and `trace_id`; older databases get the columns on first open.
+
+### What the rehearsal found (known limits, not fixed in Step 5)
+Read by hand against `KNOWN-TRAPS.md`; stage attribution comes from the traces (classify output, gather tool sequence). These are Maya answer-quality limits from Step 3, now visible and measurable. They are the next work item, not part of Step 5.
+- **Gather stops before a document search** (M-I-03 "eligible for remote equipment?", M-S-01 t2 "what does the offer letter say?"): classify listed the right lookups, gather ran only database tools and ended. The one-time nudge counts calls, not whether a document lookup happened. Answers were wrong (M-I-03 said not eligible; the trap list says eligible) or "cannot determine".
+- **Classify says `requires_tools=false` and answers from memory** (M-S-01 t6 headset, t9 Finance): the answers say "no headset" and "the freeze blocks it, Finance is not the issue"; the trap list says the freeze threshold applies to the increment and Finance approval is still required for an expansion.
+- **Numbered citation `[1]`** on M-S-01 t8 and a non-manager asking about the manager's guide (M-S-02 t4) gets handbook text without being told the guide is restricted.
+- **Classify's forced tool call can come back `malformed_tool_use`** on long prompts (M-S-01 t12 "write the full status summary", M-S-02 t4). It is retried twice with a small temperature bump; M-S-01 t12 still fell back to the default plan. The fallback is flagged in the trace (`fallbacks: classify_default_plan`, WARNING span) and the answer is still produced. Candidate fix: retry that failure in plain JSON mode.
+- Not diagnosed: W-I-02 (passed in the rehearsal, 1/3 in Step 4), S6/S7/S8 turns 1-3 (need the 3-run replay). The typo cause of the missing `E010` ("rrachel stein") is fixed and tested.

@@ -169,7 +169,7 @@ def test_write_without_consent_or_with_wrong_consent_writes_nothing():
     before = counts()
     with pytest.raises(PermissionError):
         tools.create_access_request("E010", "E010", "Webex", "x", "c1", AS_OF, "no-such-consent")
-    tools.record_consent("E010", "E010", "Webex", "m1", "d", AS_OF)
+    tools.record_consent("E010", "E010", "Webex", "m1", "d", AS_OF, gate.consent_token("E010", "E010", "Webex", "m1", "d"))
     with pytest.raises(PermissionError):                          # consent is bound to the caller, employee and system
         tools.create_access_request("E010", "E010", "Okta", "x", "c1", AS_OF, "m1")
     with pytest.raises(PermissionError):
@@ -178,7 +178,7 @@ def test_write_without_consent_or_with_wrong_consent_writes_nothing():
 
 
 def test_release_refused_unless_every_approval_row_is_approved():
-    tools.record_consent("E010", "E010", "Webex", "m1", "d", AS_OF)
+    tools.record_consent("E010", "E010", "Webex", "m1", "d", AS_OF, gate.consent_token("E010", "E010", "Webex", "m1", "d"))
     for state in ("needed", "pending"):
         with pytest.raises(PermissionError):
             tools.release_access("E010", "AR001", "m1", "c1", AS_OF)

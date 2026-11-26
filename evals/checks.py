@@ -47,6 +47,18 @@ def call_efficiency(calls):
     return len(set(sig)) / len(sig), f"{len(sig) - len(set(sig))} repeated call(s)"
 
 
+def fact_stage(spec: str, evidence_text: str, answer: str, intent_ok: bool = True):
+    """Where did a missed required fact get lost? Reads the stage, so a fix goes where the failure is.
+    None = the fact is in the answer (nothing to attribute)."""
+    if matches(answer, spec):
+        return None
+    if not intent_ok:
+        return "classify", f"intent was wrong, {spec!r} never looked up"
+    if matches(evidence_text, spec):
+        return "answer", f"{spec!r} was in the evidence but the answer left it out"
+    return "gather", f"{spec!r} was never gathered (no tool or search returned it)"
+
+
 def score_turn(t: dict, calls: list, intent=None) -> dict:
     called = [c["tool"] for c in calls]
     r = {"intent_accuracy": intent_accuracy(intent, t.get("expected_intent")),

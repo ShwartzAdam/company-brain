@@ -1,6 +1,13 @@
 """Tool logic behind the MCP server. The graph never imports this; it calls MCP tools.
 All writes go through release_write(), the only place a write is committed."""
+import contextvars
+import difflib
+
 from brain import db, gate, people, retrieval
+
+# (request_id, trace_id) of the client call being served: set by the MCP server wrapper, stored on every write
+# so a database row can be followed back to the trace that caused it. Empty when called directly (tests).
+REQUEST: contextvars.ContextVar = contextvars.ContextVar("request", default=("", ""))
 
 # ---------- reads ----------
 
@@ -22,13 +29,16 @@ def search_documents(query: str, caller_id: str, corpus: str | None = None, k: i
 
 
 def get_employee(query: str) -> list[dict]:
-    """Find employees by id, email or name; returns id, role, manager, group."""
-    like = f"%{query}%"
-    return _cite(db.rows(
-        "SELECT employee_id, full_name, email, role, department_id, manager_id, location, "
-        "employment_type, status, user_group_id FROM employees "
-        "WHERE employee_id = ? OR lower(email) = lower(?) OR lower(full_name) LIKE lower(?) "
-        "ORDER BY full_name", (query, query, like)), "employees", "employee_id")
+    """Find employees by id, email or name; returns id, role, manager, group. Tolerates a typo in the name."""
+    cols = ("employee_id, full_name, email, role, department_id, manager_id, location, "
+            "employment_type, status, user_group_id")
+    out = db.rows(f"SELECT {cols} FROM employees WHERE employee_id = ? OR lower(email) = lower(?) "
+                  "OR lower(full_name) LIKE lower(?) ORDER BY full_name", (query, query, f"%{query}%"))
+    if not out:  # 'rrachel stein': no exact hit, so accept ONLY a close full-name match (never a first-name guess)
+        allp = db.rows(f"SELECT {cols} FROM employees ORDER BY full_name")
+        close = difflib.get_close_matches(query.lower().strip(), [e["full_name"].lower() for e in allp], n=2, cutoff=0.85)
+        out = [e for e in allp if e["full_name"].lower() in close]
+    return _cite(out, "employees", "employee_id")
 
 def list_direct_reports(manager_id: str) -> list[dict]:
     """List the employees who report to a manager id."""
@@ -124,8 +134,9 @@ def release_write(kind: str, key: str, as_of: str, fn) -> dict:
         if done:
             return {"replayed": True, "entity_id": done["entity_id"]}
         entity_id, result = fn(c)
-        c.execute("INSERT INTO write_keys (key, kind, entity_id, created_at) VALUES (?,?,?,?)",
-                  (key, kind, entity_id, as_of))
+        rid, tid = REQUEST.get()
+        c.execute("INSERT INTO write_keys (key, kind, entity_id, created_at, request_id, trace_id) VALUES (?,?,?,?,?,?)",
+                  (key, kind, entity_id, as_of, rid, tid))
         c.commit()
         return {"replayed": False, "entity_id": entity_id, **result}
     except Exception:
@@ -155,8 +166,11 @@ def _allowed_actor(caller_id: str, employee_id: str) -> bool:
     return bool(r) and r[0]["user_group_id"] in ("UG_HR", "UG_IT")
 
 
-def record_consent(caller_id: str, employee_id: str, system: str, message_id: str, draft: str, as_of: str) -> dict:
-    """CODE-ONLY (never visible to a model): the application records the caller's own current-message consent."""
+def record_consent(caller_id: str, employee_id: str, system: str, message_id: str, draft: str, as_of: str,
+                   consent_token: str = "") -> dict:
+    """CODE-ONLY (never visible to a model): the application records the caller's own current-message consent.
+    Needs the HMAC the application mints with CONSENT_SECRET, so a client with raw MCP access cannot create consent."""
+    gate.check_consent_token(consent_token, caller_id, employee_id, system, message_id, draft)
     sysrow = _system(system)
 
     def fn(c):

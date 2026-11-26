@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 os.environ["LANGFUSE_TRACING_ENABLED"] = "false"  # tests never send traces
+os.environ.setdefault("CONSENT_SECRET", "test-secret-not-a-real-one")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from brain import db, llm  # noqa: E402

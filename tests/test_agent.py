@@ -220,7 +220,7 @@ def test_missing_required_argument_is_rejected_not_crashed(scripted, hits, tmp_p
 
 
 # ---- lesson fixes: forced-tool structured output, `other` fails open ----
-def test_structured_validates_retries_once_then_raises(scripted):
+def test_structured_validates_retries_twice_then_raises(scripted):
     from brain import llm
     b = scripted("not json", '{"tool": "x"}')
     schema = {"type": "object", "properties": {"tool": {"type": "string"}}, "required": ["tool"]}
@@ -229,7 +229,7 @@ def test_structured_validates_retries_once_then_raises(scripted):
     import pytest
     with pytest.raises(ValueError):
         llm.structured([{"role": "user", "content": "q"}], "s", schema)
-    assert len(b2.calls) == 2  # one try + one retry, no more
+    assert len(b2.calls) == 3  # one try + two retries (a malformed forced call repeats at temperature 0), no more
 
 
 def test_structured_uses_forced_tool_backend_when_present():
@@ -366,3 +366,11 @@ def test_checklist_built_by_code_cited_and_blocked_reason_names_the_seats(script
 def test_no_checklist_without_task_rows(scripted, hits, tmp_path):
     scripted(plan("policy_question", False), "text")
     assert turn("E004", "hello", "t-cl2", tmp_path, "UG_HR").extra["checklist"] is None
+
+
+def test_evidence_shrink_keeps_every_source_whole():
+    from brain import graph
+    rows = [{"source": f"documents/handbook/getting-started-{i}.md", "text": "word " * 400} for i in range(8)]
+    out = graph._evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
+    assert all(r["source"] in out for r in rows)  # the old [:1500] cut a source in half
+    assert len(out) < 4000

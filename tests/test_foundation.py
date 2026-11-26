@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from brain import db, ingest, people, retrieval, tools
+from brain import db, gate, ingest, people, retrieval, tools
 
 ROOT = Path(__file__).resolve().parent.parent
 AS_OF = "2026-07-01T12:00:00Z"
@@ -64,7 +64,7 @@ def test_filter_is_in_query_body(fake_llm):
 
 
 def consent(caller, emp, system="Webex", mid="m1"):
-    tools.record_consent(caller, emp, system, mid, "draft", AS_OF)
+    tools.record_consent(caller, emp, system, mid, "draft", AS_OF, gate.consent_token(caller, emp, system, mid, "draft"))
     return mid
 
 

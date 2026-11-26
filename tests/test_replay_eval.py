@@ -35,3 +35,10 @@ def test_compare_flags_only_drops():
                  "3": {"runs": 3, "passes": 0, "fails": []}}}
     r = sr.compare(old, new)
     assert len(r) == 1 and r[0].startswith("S t1: 3/3 -> 2/3")
+
+
+def test_eval_selftests_run_offline():
+    import score_traces, webex_checks, checks  # noqa: E401
+    checks._selftest()
+    webex_checks._selftest()
+    score_traces.selftest()
