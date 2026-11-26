@@ -130,6 +130,9 @@ agent.resume          its own trace; metadata resume_of = the paused turn's requ
 - Behaviour: `get_employee` accepts a near-exact full name ("rrachel stein" returned nothing before; "Maya" stays ambiguous). `record_consent` now needs an HMAC minted from `CONSENT_SECRET` (set it in `.env`, same value for the app and the server), so a client with raw MCP access cannot create consent; the regex consent heuristic itself is unchanged.
 - `write_keys` gained `request_id` and `trace_id`; older databases get the columns on first open.
 
+### RAG preprocessing investigation
+See `RAG-FINDINGS.md` (PR #17): what was wrong, what was built (opt-in variants), measured results, and why the new variant is not the default.
+
 ### What the rehearsal found (known limits, not fixed in Step 5)
 Read by hand against `KNOWN-TRAPS.md`; stage attribution comes from the traces (classify output, gather tool sequence). These are Maya answer-quality limits from Step 3, now visible and measurable. They are the next work item, not part of Step 5.
 - **Gather stops before a document search** (M-I-03 "eligible for remote equipment?", M-S-01 t2 "what does the offer letter say?"): classify listed the right lookups, gather ran only database tools and ended. The one-time nudge counts calls, not whether a document lookup happened. Answers were wrong (M-I-03 said not eligible; the trap list says eligible) or "cannot determine".
