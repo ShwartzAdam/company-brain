@@ -373,4 +373,4 @@ def test_evidence_shrink_keeps_every_source_whole():
     rows = [{"source": f"documents/handbook/getting-started-{i}.md", "text": "word " * 400} for i in range(8)]
     out = graph._evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
     assert all(r["source"] in out for r in rows)  # the old [:1500] cut a source in half
-    assert len(out) < 4000
+    assert len(out) < graph.EVIDENCE_CHARS + 2000
