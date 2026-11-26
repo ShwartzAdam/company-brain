@@ -116,10 +116,7 @@ GATHER_SYSTEM = (
     "stop with done as soon as the question can be answered. Never call anything to file or approve.")
 
 
-EVIDENCE_CHARS = 12000  # 8 whole-document results at about 1400 characters each; 1500 cut each to 120 and lost the rule
-
-
-def _shrink(result, limit: int = EVIDENCE_CHARS):
+def _shrink(result, limit: int = 1500):
     """Cap a tool result near `limit` characters by shortening each row's `text`, never by cutting the JSON string:
     a cut string once ended mid-`source` and the model cited '[documents/handbook/getting-.]'."""
     if not isinstance(result, list) or len(json.dumps(result)) <= limit:
@@ -130,7 +127,7 @@ def _shrink(result, limit: int = EVIDENCE_CHARS):
 
 
 def _evidence_text(ev: list) -> str:
-    return "\n".join(f"[{i}] {e['tool']}({json.dumps(e['args'])}) -> {json.dumps(_shrink(e['result']))[:EVIDENCE_CHARS + 2000]}"
+    return "\n".join(f"[{i}] {e['tool']}({json.dumps(e['args'])}) -> {json.dumps(_shrink(e['result']))[:3000]}"
                      for i, e in enumerate(ev, 1)) or "(none yet)"
 
 

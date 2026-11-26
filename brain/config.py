@@ -18,6 +18,6 @@ MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-2-lite-v1:0")
 EMBED_MODEL_ID = os.getenv("BEDROCK_EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0")
 EMBED_DIM = 1024
 OPENSEARCH_COLLECTION = os.getenv("OPENSEARCH_COLLECTION", "company-brain")
-INDEX_NAME = os.getenv("OPENSEARCH_INDEX", "company-brain-docs-v2b")
+INDEX_NAME = os.getenv("OPENSEARCH_INDEX", "company-brain-docs")
 MCP_HOST, MCP_PORT = "127.0.0.1", int(os.getenv("MCP_PORT", "9890"))
 MCP_URL = f"http://{MCP_HOST}:{MCP_PORT}/mcp"

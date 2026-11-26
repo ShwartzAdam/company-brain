@@ -1,8 +1,9 @@
 """Read the 7 document folders, keep `audience`, chunk, embed, index.
-INGEST_VARIANT (env, default b): base = chunk every heading (the original; index company-brain-docs);
-a = whole-document entries for small docs + context prefix + doc_type/system fields; b = a + one summary line
-per document (state/doc_summaries.json, from scripts/gen_summaries.py). RETRIEVAL_VARIANT=c (default) is the
-matching search. Original behaviour: OPENSEARCH_INDEX=company-brain-docs INGEST_VARIANT=base RETRIEVAL_VARIANT=base."""
+INGEST_VARIANT (env, default base = chunk every heading, index company-brain-docs): a = whole-document entries for
+small docs + context prefix + doc_type/system fields; b = a + one summary line per document
+(state/doc_summaries.json, from scripts/gen_summaries.py). RETRIEVAL_VARIANT=c is the matching document-level search
+(opt-in: it needs a larger evidence budget in the agent that currently breaks M-S-02 t1, see PR #17).
+Opt-in run: OPENSEARCH_INDEX=company-brain-docs-v2b INGEST_VARIANT=b RETRIEVAL_VARIANT=c."""
 import json
 import os
 import re
@@ -68,7 +69,7 @@ def chunk(title: str, body: str) -> list[tuple[str, str]]:
 
 
 def variant() -> str:
-    return os.getenv("INGEST_VARIANT", "b")
+    return os.getenv("INGEST_VARIANT", "base")
 
 
 def _inline_fields(body: str) -> dict:

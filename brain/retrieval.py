@@ -153,7 +153,7 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
     def q(body, raw=False):
         r = os_client.search(index=config.INDEX_NAME, body=body)
         return r if raw else r["hits"]["hits"]
-    if mode == "rerank" and os.getenv("RETRIEVAL_VARIANT", "c") == "c":
+    if mode == "rerank" and os.getenv("RETRIEVAL_VARIANT", "base") == "c":
         # `corpus` is a preference here, not a wall: a model that guesses the wrong corpus must still reach the
         # contract or policy that holds the answer. The audience filter stays in every query.
         docs, must = _doc_candidates(query, caller_id, None, q)
