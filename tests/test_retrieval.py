@@ -60,3 +60,20 @@ def test_playbook_unreachable_for_non_manager_even_when_named_and_open_for_a_man
     finally:
         os_mod.client = orig
     assert cap.bodies and all("'audience': 'all'" in str(b) for b in cap.bodies)
+
+
+def test_variant_c_keeps_best_contract_and_policy(monkeypatch):
+    """RETRIEVAL_VARIANT=c: the rerank may not drop the fixed contract / policy slots."""
+    docs = [_hit(i) for i in range(6)]
+    contract, policy = _hit(7, "contracts"), _hit(8, "policies")
+    monkeypatch.setenv("RETRIEVAL_VARIANT", "c")
+    monkeypatch.setattr(retrieval, "_doc_candidates", lambda *a: (docs + [contract, policy], [contract, policy]))
+    monkeypatch.setattr(retrieval, "rerank", lambda q, hits, n, chars=350: docs[:n])
+    monkeypatch.setattr(retrieval, "_result", lambda hits, *a: [h["_id"] for h in hits])
+
+    class C:
+        def search(self, **kw):
+            return {"hits": {"hits": []}}
+
+    out = retrieval.search("q", "E010", k=5, os_client=C())
+    assert len(out) == 5 and {"7", "8"} <= set(out) and out[:3] == ["0", "1", "2"]

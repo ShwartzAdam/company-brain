@@ -1,0 +1,185 @@
+[
+ {
+  "case_id": "X01",
+  "query": "Who needs to approve AWS admin access?",
+  "expected_documents": [
+   "aws_console_access.md",
+   "access_management_policy.md"
+  ]
+ },
+ {
+  "case_id": "X02",
+  "query": "My VPN connection is not working, what do I check?",
+  "expected_documents": [
+   "vpn_access.md"
+  ]
+ },
+ {
+  "case_id": "X03",
+  "query": "How many Webex seats does our contract allow?",
+  "expected_documents": [
+   "webex_vendor_agreement.md"
+  ]
+ },
+ {
+  "case_id": "X04",
+  "query": "When does the Datadog contract end and how does it renew?",
+  "expected_documents": [
+   "datadog_observability_agreement.md"
+  ]
+ },
+ {
+  "case_id": "X05",
+  "query": "What is the Miro support SLA?",
+  "expected_documents": [
+   "miro_collaboration_agreement.md"
+  ]
+ },
+ {
+  "case_id": "X06",
+  "query": "What is the SaaS expansion approval threshold this quarter?",
+  "expected_documents": [
+   "saas_renewal_freeze_q3.md",
+   "saas_procurement_policy.md"
+  ]
+ },
+ {
+  "case_id": "X07",
+  "query": "Which systems need a security review before renewal?",
+  "expected_documents": [
+   "security_review_update.md"
+  ]
+ },
+ {
+  "case_id": "X08",
+  "query": "Which department owns the Figma contract?",
+  "expected_documents": [
+   "contract_owner_cleanup_memo.md",
+   "figma_design_license.md"
+  ]
+ },
+ {
+  "case_id": "X09",
+  "query": "Can remote employees get a monitor and a dock?",
+  "expected_documents": [
+   "remote_equipment_budget_update.md",
+   "equipment_policy.md"
+  ]
+ },
+ {
+  "case_id": "X10",
+  "query": "How do I reset a forgotten Okta password?",
+  "expected_documents": [
+   "password_reset.md"
+  ]
+ },
+ {
+  "case_id": "X11",
+  "query": "How is Slack set up for a new employee?",
+  "expected_documents": [
+   "slack_onboarding.md"
+  ]
+ },
+ {
+  "case_id": "X12",
+  "query": "Can a Customer Success employee get Salesforce access?",
+  "expected_documents": [
+   "new_salesforce_access_rules.md",
+   "salesforce_access_request.md",
+   "access_management_policy.md"
+  ]
+ },
+ {
+  "case_id": "X13",
+  "query": "What happens to someone's access when they leave the company?",
+  "expected_documents": [
+   "offboarding_policy.md"
+  ]
+ },
+ {
+  "case_id": "X14",
+  "query": "How do I request Notion access?",
+  "expected_documents": [
+   "notion_access.md"
+  ]
+ },
+ {
+  "case_id": "X15",
+  "query": "How is a laptop provisioned for a new hire?",
+  "expected_documents": [
+   "laptop_provisioning.md",
+   "equipment_policy.md"
+  ]
+ },
+ {
+  "case_id": "X16",
+  "query": "Who approves Jira project admin access?",
+  "expected_documents": [
+   "jira_project_access.md",
+   "access_management_policy.md"
+  ]
+ },
+ {
+  "case_id": "X17",
+  "query": "When does the Salesforce subscription renew and what is the notice period?",
+  "expected_documents": [
+   "salesforce_subscription_agreement.md"
+  ]
+ },
+ {
+  "case_id": "X18",
+  "query": "Can an employee see their own pay stubs in BambooHR?",
+  "expected_documents": [
+   "access_management_policy.md"
+  ]
+ },
+ {
+  "case_id": "X19",
+  "query": "How should a manager run 1:1s?",
+  "expected_documents": [
+   "1-1s.md"
+  ]
+ },
+ {
+  "case_id": "X20",
+  "query": "How do I give feedback to a direct report?",
+  "expected_documents": [
+   "giving-feedback.md"
+  ]
+ },
+ {
+  "case_id": "X21",
+  "query": "What is the moonlighting rule?",
+  "expected_documents": [
+   "moonlighting.md"
+  ]
+ },
+ {
+  "case_id": "X22",
+  "query": "What was decided in the Webex license cleanup?",
+  "expected_documents": [
+   "webex_license_cleanup_memo.md"
+  ]
+ },
+ {
+  "case_id": "X23",
+  "query": "What are the first steps for a suspicious email alert?",
+  "expected_documents": [
+   "email_security_alert.md"
+  ]
+ },
+ {
+  "case_id": "X24",
+  "query": "Which department is Rachel Stein in and who approves her access?",
+  "expected_documents": [
+   "rachel_stein_customer_success_access_profile.md"
+  ]
+ },
+ {
+  "case_id": "X25",
+  "query": "Does Webex support SLA say how fast P1 issues are handled?",
+  "expected_documents": [
+   "webex_vendor_agreement.md"
+  ]
+ }
+]

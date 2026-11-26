@@ -13,3 +13,4 @@ data/
 *.db-shm
 *.db-wal
 !evals/results/
+state/doc_summaries.json

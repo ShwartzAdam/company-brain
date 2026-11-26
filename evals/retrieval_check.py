@@ -13,6 +13,7 @@ from brain import opensearch, retrieval
 ap = argparse.ArgumentParser()
 ap.add_argument("mode", nargs="?", default="rerank", choices=["vector", "hybrid", "rerank"])
 ap.add_argument("--runs", type=int, default=1)
+ap.add_argument("--extra", action="store_true", help="also score evals/extra_cases.json (25 more labelled questions)")
 a = ap.parse_args()
 K = 5
 NEEDS_AGENT = {"SIMPLE_015", "SIMPLE_016", "SIMPLE_019"}  # meta / ambiguous / multi-hop
@@ -22,6 +23,11 @@ SETS = {
     "single_turn_cases": [(x["case_id"], x["input"], [s for s in x["expected_sources"] if s.endswith(".md")])
                           for x in GOLD["single_turn_cases"]],
 }
+if a.extra:
+    import json
+    from pathlib import Path
+    SETS["extra_cases"] = [(x["case_id"], x["query"], x["expected_documents"])
+                           for x in json.loads((Path(__file__).parent / "extra_cases.json").read_text())]
 
 
 def one_run(cases):
