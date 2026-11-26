@@ -14,6 +14,8 @@ INDEX_BODY = {
         "audience": {"type": "keyword"},   # all | manager (missing front matter => all)
         "title": {"type": "keyword"},
         "section": {"type": "keyword"},
+        "doc_type": {"type": "keyword"},   # variants a+: contract | kb_article | policy | memo | ...
+        "system": {"type": "keyword"},     # variants a+: Webex, Salesforce, ... (may be several)
     }},
 }
 

@@ -60,3 +60,42 @@ def test_playbook_unreachable_for_non_manager_even_when_named_and_open_for_a_man
     finally:
         os_mod.client = orig
     assert cap.bodies and all("'audience': 'all'" in str(b) for b in cap.bodies)
+
+
+def test_variant_c_keeps_best_contract_and_policy(monkeypatch):
+    """RETRIEVAL_VARIANT=c: the rerank may not drop the fixed contract / policy slots."""
+    docs = [_hit(i) for i in range(6)]
+    contract, policy = _hit(7, "contracts"), _hit(8, "policies")
+    monkeypatch.setenv("RETRIEVAL_VARIANT", "c")
+    monkeypatch.setattr(retrieval, "_doc_candidates", lambda *a: (docs + [contract, policy], [contract, policy]))
+    monkeypatch.setattr(retrieval, "rerank", lambda q, hits, n, chars=350: docs[:n])
+    monkeypatch.setattr(retrieval, "_result", lambda hits, *a: [h["_id"] for h in hits])
+
+    class C:
+        def search(self, **kw):
+            return {"hits": {"hits": []}}
+
+    out = retrieval.search("q", "E010", k=5, os_client=C())
+    assert len(out) == 5 and {"7", "8"} <= set(out) and out[:3] == ["0", "1", "2"]
+
+
+def test_variant_c_corpus_is_a_preference_not_a_wall(monkeypatch):
+    """A model that asks for corpus=policies must still be able to receive the contract; audience stays hard."""
+    seen = {}
+    contract = _hit(7, "contracts")
+
+    def cand(query, caller, corpus, q):
+        seen["corpus"] = corpus
+        return [contract] + [_hit(i, "policies") for i in range(6)], []
+
+    monkeypatch.setenv("RETRIEVAL_VARIANT", "c")
+    monkeypatch.setattr(retrieval, "_doc_candidates", cand)
+    monkeypatch.setattr(retrieval, "rerank", lambda q, hits, n, chars=350: hits[:n])
+    monkeypatch.setattr(retrieval, "_result", lambda hits, *a: [h["_source"]["corpus"] for h in hits])
+
+    class C:
+        def search(self, **kw):
+            return {"hits": {"hits": [_hit(20, "policies")]}}
+
+    out = retrieval.search("q", "E010", k=3, corpus="policies", os_client=C())
+    assert seen["corpus"] is None and out[0] == "policies" and "contracts" in out
