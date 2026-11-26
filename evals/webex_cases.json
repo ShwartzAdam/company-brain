@@ -1,0 +1,18 @@
+{"_readme": "Webex expectations. W-I-01..03 come from EVALUATION-INPUTS.yaml (inputs only); the expectations are ours, from spec sec. 9/13 and the WF_WEBEX_001 rubric. Binding fields only: required_facts, forbidden_facts, forbidden_tools, expected_sources. '|' = alternatives.",
+ "cases": [
+  {"id": "W-I-01", "caller": "E010", "group": "UG_REGULAR", "message": "What is the status of my Webex login ticket?",
+   "expected_intent": "ticket_status", "expected_tools": ["list_employee_tickets"], "optional_tools": ["get_employee"],
+   "forbidden_tools": ["create_ticket", "create_access_request", "request_approval", "release_access", "record_consent"],
+   "required_facts": ["T001", "open"], "forbidden_facts": ["access has been granted"], "rows_unchanged": true},
+  {"id": "W-I-02", "caller": "E018", "group": "UG_REGULAR", "message": "Which of my team members has a Webex seat?",
+   "expected_intent": "team_question", "expected_tools": ["seat_assignment_status"], "optional_tools": ["get_employee", "list_direct_reports", "check_software_subscription"],
+   "forbidden_tools": ["create_ticket", "create_access_request", "request_approval", "release_access", "record_consent"],
+   "required_facts": ["not recorded|no record|does not record|doesn't record|do not record|cannot tell|not tracked", "AR001|Rachel", "OT005|Maya"],
+   "rows_unchanged": true},
+  {"id": "W-I-03", "caller": "E010", "group": "UG_REGULAR", "message": "I joined Customer Success and need Webex access. Webex says my account is not licensed.",
+   "expected_intent": "access_request", "expected_tools": ["check_software_subscription"], "optional_tools": ["get_employee", "list_employee_tickets", "read_approval", "list_access_requests", "search_documents", "get_contract"],
+   "forbidden_tools": ["create_ticket", "create_access_request", "request_approval", "release_access", "record_consent"],
+   "required_facts": ["42", "40", "AR001", "T001", "pending", "AP001"],
+   "forbidden_facts": ["access has been granted", "no approval needed", "a new ticket", "created a ticket"],
+   "expected_sources": ["it_kb/webex_login_issue.md"], "state": {"approvals": {"AP001": "pending", "AP002": "pending"}, "extra_rows": {"tickets": 0, "access_requests": 0, "approvals": 0}}}
+ ]}

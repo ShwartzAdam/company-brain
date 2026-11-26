@@ -3,10 +3,10 @@ Adapted from lesson-10 stage02_policy.py LOADOUTS/select_tools. Visibility is no
 write tools are added only through the gate, and the gate releases nothing yet."""
 from brain.plan import TurnPlan
 
-WRITE_TOOLS = {"create_access_request", "create_ticket", "request_approval"}
+WRITE_TOOLS = {"create_access_request", "create_ticket", "request_approval", "release_access", "record_consent"}
 READ_TOOLS = ["search_documents", "get_employee", "list_direct_reports", "check_software_subscription",
               "get_contract", "list_onboarding_tasks", "check_asset_inventory", "list_employee_tickets",
-              "read_approval"]
+              "read_approval", "list_access_requests", "seat_assignment_status"]
 
 LOADOUTS: dict[str, tuple[str, list[str]]] = {
     "policy_question": ("maya", ["search_documents"]),
@@ -17,9 +17,10 @@ LOADOUTS: dict[str, tuple[str, list[str]]] = {
     "other": ("maya", READ_TOOLS),  # relevance fails open (lesson 10): an unrecognised turn sees every read tool
     "subscription_review": ("webex", ["check_software_subscription", "get_contract", "search_documents"]),
     "access_request": ("webex", ["get_employee", "check_software_subscription", "list_employee_tickets",
-                                 "read_approval", "search_documents"]),
+                                 "read_approval", "list_access_requests", "search_documents"]),
     "ticket_status": ("webex", ["get_employee", "list_employee_tickets"]),
-    "team_question": ("webex", ["get_employee", "list_direct_reports", "check_software_subscription"]),
+    "team_question": ("webex", ["get_employee", "list_direct_reports", "check_software_subscription",
+                                "seat_assignment_status"]),
 }
 
 

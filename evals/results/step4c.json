@@ -1,0 +1,109 @@
+{
+ "S4-constraint-carry": {
+  "1": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "2": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "3": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "4": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "5": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "7": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "list_access_requests",
+    "search_documents"
+   ]
+  },
+  "9": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "W-I-03": {
+  "1": {
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:access_requests/AR001",
+    "db:approvals/AP001",
+    "db:approvals/AP002",
+    "db:employees/E010",
+    "db:software_subscriptions/SUB001",
+    "db:tickets/T001",
+    "documents/it_kb/webex_license_assignment.md",
+    "documents/it_kb/webex_login_issue.md"
+   ],
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "check_software_subscription",
+    "search_documents"
+   ]
+  }
+ }
+}

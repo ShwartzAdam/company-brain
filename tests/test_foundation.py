@@ -63,20 +63,27 @@ def test_filter_is_in_query_body(fake_llm):
     assert "filter" not in mgr
 
 
+def consent(caller, emp, system="Webex", mid="m1"):
+    tools.record_consent(caller, emp, system, mid, "draft", AS_OF)
+    return mid
+
+
 def test_access_request_reuses_and_is_idempotent():
-    a = tools.create_access_request("E018", "E010", "Webex", "calls", "c1", AS_OF)
+    consent("E018", "E010")
+    a = tools.create_access_request("E018", "E010", "Webex", "calls", "c1", AS_OF, "m1")
     assert a["entity_id"] == "AR001" and a["reused"]
-    b = tools.create_access_request("E018", "E010", "Webex", "calls", "c1", AS_OF)
+    b = tools.create_access_request("E018", "E010", "Webex", "calls", "c1", AS_OF, "m1")
     assert b["replayed"]
     n = len(db.rows("SELECT 1 FROM access_requests"))
-    tools.create_access_request("E018", "E010", "Webex", "calls", "c2", AS_OF)
+    tools.create_access_request("E018", "E010", "Webex", "calls", "c2", AS_OF, "m1")
     assert len(db.rows("SELECT 1 FROM access_requests")) == n
 
 
 def test_new_request_twice_one_row():
+    consent("E001", "E001", "Okta")
     n = len(db.rows("SELECT 1 FROM access_requests"))
-    tools.create_access_request("E001", "E001", "Okta", "start", "c1", AS_OF)
-    tools.create_access_request("E001", "E001", "Okta", "start", "c1", AS_OF)
+    tools.create_access_request("E001", "E001", "Okta", "start", "c1", AS_OF, "m1")
+    tools.create_access_request("E001", "E001", "Okta", "start", "c1", AS_OF, "m1")
     assert len(db.rows("SELECT 1 FROM access_requests")) == n + 1
 
 
@@ -86,20 +93,23 @@ def test_ticket_reuses_t001():
 
 
 def test_approval_request_transitions_once():
-    r = tools.request_approval("E018", "AP001", "c1", AS_OF)
+    consent("E010", "E010")
+    r = tools.request_approval("E010", "AP001", "m1", "c1", AS_OF)
     assert r["status"] == "pending"
-    tools.request_approval("E018", "AP001", "c1", AS_OF)
+    tools.request_approval("E010", "AP001", "m1", "c1", AS_OF)
     assert len(db.rows("SELECT 1 FROM audit_log WHERE event_type='approval_requested'")) == 1
     assert len(db.rows("SELECT 1 FROM approvals")) == 4
 
 
 def test_cross_user_write_denied():
+    consent("E010", "E001", "Okta")
     with pytest.raises(PermissionError):
-        tools.create_access_request("E010", "E001", "Okta", "x", "c1", AS_OF)
+        tools.create_access_request("E010", "E001", "Okta", "x", "c1", AS_OF, "m1")
 
 
 def test_survives_restart():
-    tools.request_approval("E018", "AP002", "c1", AS_OF)
+    consent("E010", "E010")
+    tools.request_approval("E010", "AP002", "m1", "c1", AS_OF)
     assert {r["approval_id"]: r["status"] for r in tools.read_approval("AR001")}["AP002"] == "pending"
 
 

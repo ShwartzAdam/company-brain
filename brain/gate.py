@@ -4,7 +4,9 @@
      system, draft hash and message id.
   2. Approver approval: only approvals rows (AP001/AP002) with status 'approved' release anything that
      grants or expands. Read-only from the graph; message text can never create them.
-In Step 2 release_allowed() is always False: nothing is released yet."""
+Both checks run INSIDE tools.release_write's transaction (the one write-release function), fail closed.
+consent_from_message is a regex heuristic, not a classifier: it can refuse a clean go-ahead that contains
+a word like "only" or "if", and it cannot understand intent. It never fails open on quoted or forwarded text."""
 import hashlib
 import re
 import sqlite3
@@ -39,19 +41,48 @@ def consent_from_message(message: str) -> bool:
     return False
 
 
+_BLOCK = re.compile(r"(do not|don'?t|dont|never|not)\b.{0,30}\b(file|create|submit|execute)|\bno filing\b|until i (say|write|tell)", re.I)
+
+
+_SELF = re.compile(r"\b(i need|i want|i'?d like|i require|please (?:get|request|give|set)|can you (?:get|request|give|set)|"
+                   r"need[^.]{0,30} access)\b", re.I)
+
+
+def self_request(message: str) -> bool:
+    """Heuristic: the caller, in their own current words, asks for access for themselves."""
+    return bool(_SELF.search(top_level(message)))
+
+
+def blocks_filing(constraints) -> bool:
+    """A 'do not file until I say so' rule is still in force (the user's own constraints, kept by the planner)."""
+    return any(_BLOCK.search(c) for c in constraints or [])
+
+
+def insert_consent(c, message_id: str, caller_id: str, employee_id: str, system: str, draft: str, as_of: str) -> None:
+    c.execute(DDL)
+    c.execute("INSERT OR IGNORE INTO consents VALUES (?,?,?,?,?,?,0)",
+              (message_id, caller_id, employee_id, system.lower(), hashlib.sha256(draft.encode()).hexdigest(), as_of))
+
+
 def record_consent(path, message_id: str, caller_id: str, employee_id: str, system: str,
                    draft: str, as_of: str) -> None:
     c = sqlite3.connect(path)
     try:
-        c.execute(DDL)
-        c.execute("INSERT OR IGNORE INTO consents VALUES (?,?,?,?,?,?,0)",
-                  (message_id, caller_id, employee_id, system,
-                   hashlib.sha256(draft.encode()).hexdigest(), as_of))
+        insert_consent(c, message_id, caller_id, employee_id, system, draft, as_of)
         c.commit()
     finally:
         c.close()
 
 
-def release_allowed(*_args, **_kw) -> bool:
-    # Step 2: releases nothing. Step 3/4 will require a consent row AND, for grants, approved AP rows.
-    return False
+def check_consent(c, consent_id: str, caller_id: str, employee_id: str, system: str) -> None:
+    """Fail closed: a recorded consent bound to this caller, employee and system, or PermissionError."""
+    r = c.execute("SELECT caller_id, employee_id, system FROM consents WHERE message_id = ?", (consent_id,)).fetchone()
+    if r is None or tuple(r) != (caller_id, employee_id, system.lower()):
+        raise PermissionError("no recorded consent for this caller, employee and system")
+
+
+def approvals_recorded(c, request_id: str) -> tuple[bool, list]:
+    """True only if the request has approval rows and EVERY one has status 'approved'. Message text never counts."""
+    rows = [tuple(r) for r in c.execute("SELECT approval_id, status FROM approvals WHERE request_id = ? "
+                                        "ORDER BY approval_id", (request_id,)).fetchall()]
+    return bool(rows) and all(st == "approved" for _, st in rows), rows
