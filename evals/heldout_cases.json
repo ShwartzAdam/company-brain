@@ -1,0 +1,125 @@
+{
+ "_readme": "DRAFT held-out set, written after the design was frozen; labels need a human review before the one and only run. Run: evals/retrieval_check.py rerank --heldout --k 8. Do not tune on it.",
+ "cases": [
+  {
+   "case_id": "H01",
+   "query": "whos got to sign off before someone gets aws admin rights",
+   "expected_documents": [
+    "aws_console_access.md",
+    "access_management_policy.md"
+   ]
+  },
+  {
+   "case_id": "H02",
+   "query": "my vpn keeps dropping me out, how do i fix it",
+   "expected_documents": [
+    "vpn_access.md"
+   ]
+  },
+  {
+   "case_id": "H03",
+   "query": "how many days notice do we need to give datadog if we dont want to renew",
+   "expected_documents": [
+    "datadog_observability_agreement.md"
+   ]
+  },
+  {
+   "case_id": "H04",
+   "query": "is the q3 freeze changing who must approve extra seats on a SaaS tool",
+   "expected_documents": [
+    "saas_renewal_freeze_q3.md",
+    "saas_procurement_policy.md"
+   ]
+  },
+  {
+   "case_id": "H05",
+   "query": "we are bringing in a contractor who needs github, what approvals come first",
+   "expected_documents": [
+    "github_access_for_contractors.md",
+    "access_management_policy.md"
+   ]
+  },
+  {
+   "case_id": "H06",
+   "query": "i work from home and do lots of video calls, can i get a headset",
+   "expected_documents": [
+    "remote_equipment_budget_update.md",
+    "equipment_policy.md"
+   ]
+  },
+  {
+   "case_id": "H07",
+   "query": "an hr person asked to open everyone's salary in bamboohr, is that ok",
+   "expected_documents": [
+    "access_management_policy.md",
+    "data_access_policy.md"
+   ]
+  },
+  {
+   "case_id": "H08",
+   "query": "someone leaves on friday, what has to be turned off and handed back",
+   "expected_documents": [
+    "offboarding_policy.md"
+   ]
+  },
+  {
+   "case_id": "H09",
+   "query": "okta wont let me in after i got a new phone",
+   "expected_documents": [
+    "okta_device_change.md",
+    "mfa_reset.md"
+   ]
+  },
+  {
+   "case_id": "H10",
+   "query": "how long is the miro agreement and does it renew by itself",
+   "expected_documents": [
+    "miro_collaboration_agreement.md"
+   ]
+  },
+  {
+   "case_id": "H11",
+   "query": "how should a manager get ready for a performance review conversation",
+   "expected_documents": [
+    "performance-reviews.md"
+   ]
+  },
+  {
+   "case_id": "H12",
+   "query": "am i allowed to take a second job on the side",
+   "expected_documents": [
+    "moonlighting.md"
+   ]
+  },
+  {
+   "case_id": "H13",
+   "query": "which of our tools need a security check before we renew them",
+   "expected_documents": [
+    "security_review_update.md"
+   ]
+  },
+  {
+   "case_id": "H14",
+   "query": "external contributor needs admin on a jira project, who agrees to that",
+   "expected_documents": [
+    "jira_project_access.md",
+    "access_management_policy.md"
+   ]
+  },
+  {
+   "case_id": "H15",
+   "query": "new engineer starts monday, who orders the laptop and what is the rule",
+   "expected_documents": [
+    "laptop_provisioning.md",
+    "equipment_policy.md"
+   ]
+  },
+  {
+   "case_id": "H16",
+   "query": "got a weird phishing email, what do i do and who do i tell",
+   "expected_documents": [
+    "email_security_alert.md"
+   ]
+  }
+ ]
+}
