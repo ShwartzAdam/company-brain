@@ -13,9 +13,10 @@ from brain import opensearch, retrieval
 ap = argparse.ArgumentParser()
 ap.add_argument("mode", nargs="?", default="rerank", choices=["vector", "hybrid", "rerank"])
 ap.add_argument("--runs", type=int, default=1)
+ap.add_argument("--k", type=int, default=5, help="documents returned per search (the agent tool defaults to 8)")
 ap.add_argument("--extra", action="store_true", help="also score evals/extra_cases.json (25 more labelled questions)")
 a = ap.parse_args()
-K = 5
+K = a.k
 NEEDS_AGENT = {"SIMPLE_015", "SIMPLE_016", "SIMPLE_019"}  # meta / ambiguous / multi-hop
 c = opensearch.client()
 SETS = {

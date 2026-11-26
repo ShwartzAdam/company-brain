@@ -21,7 +21,7 @@ def _cite(rows: list[dict], table: str, key: str) -> list[dict]:
 CORPORA = ("contracts", "employment", "handbook", "internal_memos", "it_kb", "manager_playbook", "policies")
 
 
-def search_documents(query: str, caller_id: str, corpus: str | None = None, k: int = 5) -> list[dict]:
+def search_documents(query: str, caller_id: str, corpus: str | None = None, k: int = 8) -> list[dict]:
     """Search company documents. Optional corpus (leave empty unless sure): contracts, employment, handbook, internal_memos, it_kb, manager_playbook, policies."""
     if corpus not in CORPORA:  # a made-up corpus name must not silently return nothing; the audience filter still applies
         corpus = None

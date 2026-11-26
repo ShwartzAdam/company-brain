@@ -86,6 +86,9 @@ def _reserve_policy(query: str, caller_id: str, hits: list[dict], q) -> list[dic
 
 
 MUST_CONTRACTS = 2
+MUST_POLICIES = 2      # the model picks the governing policies among policies only
+MUST_MEMOS = 1         # a memo supersedes policy text; kept only when it also scored in the general pool
+MEMO_POOL_RANK = 15
 TYPED = ("contract", "kb_article", "memo")  # variant c: the document types that answer a question about a system
 _SYSTEMS: dict = {}
 
@@ -110,8 +113,8 @@ def _doc_candidates(query: str, caller_id: str, corpus: str | None, q) -> tuple[
     """Variant c candidate documents (one hit per document, best chunk): the usual fused pool, then the best
     contract / KB article / memo for each system the query names, then the best policies. Every query carries
     the same audience filter. A system name only picks which documents to search; it never decides access.
-    Also returns `must`: the best contract of each named system (at most 2) and the best policy, which the
-    model rerank may not drop."""
+    Also returns `must`, which the model rerank may not drop: the best contract of each named system (at most 2),
+    the 2 governing policies (the model picks them among policies only) and one memo that also scored in the pool."""
     pool = rrf([q(build_body(query, caller_id, POOL, corpus)), q(build_keyword_body(query, caller_id, POOL, corpus))])
     typed, must = [], []
     for sysname in [x for x in _known_systems(q, caller_id) if re.search(rf"\b{re.escape(x)}\b", query, re.I)]:
@@ -123,10 +126,17 @@ def _doc_candidates(query: str, caller_id: str, corpus: str | None, q) -> tuple[
     pol = []
     if corpus is None:
         pol = rrf([q(build_body(query, caller_id, POLICY_POOL, "policies")),
-                   q(build_keyword_body(query, caller_id, POLICY_POOL, "policies"))])[:3]
-    must = must[:MUST_CONTRACTS] + pol[:1]
+                   q(build_keyword_body(query, caller_id, POLICY_POOL, "policies"))])[:POLICY_POOL]
+    must = must[:MUST_CONTRACTS]
+    if pol:
+        must += rerank(query, pol[:POLICY_POOL], MUST_POLICIES, chars=1200)
+    if corpus is None:
+        memos = rrf([q(build_body(query, caller_id, POLICY_POOL, "internal_memos")),
+                     q(build_keyword_body(query, caller_id, POLICY_POOL, "internal_memos"))])[:MUST_MEMOS]
+        near = {h["_source"]["source"] for h in pool[:MEMO_POOL_RANK]}
+        must += [m for m in memos if m["_source"]["source"] in near]
     docs, seen = [], set()
-    for h in typed + pol + pool:  # first hit per document wins, coverage first
+    for h in typed + pol[:3] + pool:  # first hit per document wins, coverage first
         if h["_source"]["source"] not in seen:
             seen.add(h["_source"]["source"])
             docs.append(h)
