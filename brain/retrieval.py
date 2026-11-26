@@ -90,15 +90,20 @@ TYPED = ("contract", "kb_article", "memo")  # variant c: the document types that
 _SYSTEMS: dict = {}
 
 
-def _known_systems(q) -> list[str]:
-    """System names stored on the index (variants a+); empty on the baseline index."""
-    if "s" not in _SYSTEMS:
+def _known_systems(q, caller_id: str) -> list[str]:
+    """System names stored on the index (variants a+); empty on the baseline index. The audience filter
+    applies here too, so a restricted document never contributes even a name to a caller who may not see it."""
+    f = audience_filter(caller_id)
+    key = bool(f)
+    if key not in _SYSTEMS:
         try:
-            r = q({"size": 0, "aggs": {"s": {"terms": {"field": "system", "size": 200}}}}, raw=True)
-            _SYSTEMS["s"] = [b["key"] for b in r["aggregations"]["s"]["buckets"]]
+            body = {"size": 0, "aggs": {"s": {"terms": {"field": "system", "size": 200}}}}
+            if f:
+                body["query"] = {"bool": {"filter": f}}
+            _SYSTEMS[key] = [b["key"] for b in q(body, raw=True)["aggregations"]["s"]["buckets"]]
         except Exception:
             return []
-    return _SYSTEMS["s"]
+    return _SYSTEMS[key]
 
 
 def _doc_candidates(query: str, caller_id: str, corpus: str | None, q) -> tuple[list[dict], list[dict]]:
@@ -109,7 +114,7 @@ def _doc_candidates(query: str, caller_id: str, corpus: str | None, q) -> tuple[
     model rerank may not drop."""
     pool = rrf([q(build_body(query, caller_id, POOL, corpus)), q(build_keyword_body(query, caller_id, POOL, corpus))])
     typed, must = [], []
-    for sysname in [x for x in _known_systems(q) if re.search(rf"\b{re.escape(x)}\b", query, re.I)]:
+    for sysname in [x for x in _known_systems(q, caller_id) if re.search(rf"\b{re.escape(x)}\b", query, re.I)]:
         ex = [{"term": {"system": sysname}}]
         found = rrf([q(build_body(query, caller_id, 10, corpus, ex)), q(build_keyword_body(query, caller_id, 10, corpus, ex))])
         for t in TYPED:
@@ -138,7 +143,7 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
     def q(body, raw=False):
         r = os_client.search(index=config.INDEX_NAME, body=body)
         return r if raw else r["hits"]["hits"]
-    if mode == "rerank" and os.getenv("RETRIEVAL_VARIANT") == "c":
+    if mode == "rerank" and os.getenv("RETRIEVAL_VARIANT", "c") == "c":
         docs, must = _doc_candidates(query, caller_id, corpus, q)
         hits = rerank(query, docs, k, chars=1200)
         have = {h["_source"]["source"] for h in hits}

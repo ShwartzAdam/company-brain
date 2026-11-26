@@ -1,7 +1,8 @@
-"""Read the 7 document folders, keep `audience`, chunk by heading, embed, index.
-INGEST_VARIANT (env): base = chunk every heading (default, unchanged); a = whole-document entries for small
-docs + context prefix + doc_type/system fields; b = a + one summary line per document (state/doc_summaries.json);
-c = same index as b (the change is in retrieval)."""
+"""Read the 7 document folders, keep `audience`, chunk, embed, index.
+INGEST_VARIANT (env, default b): base = chunk every heading (the original; index company-brain-docs);
+a = whole-document entries for small docs + context prefix + doc_type/system fields; b = a + one summary line
+per document (state/doc_summaries.json, from scripts/gen_summaries.py). RETRIEVAL_VARIANT=c (default) is the
+matching search. Original behaviour: OPENSEARCH_INDEX=company-brain-docs INGEST_VARIANT=base RETRIEVAL_VARIANT=base."""
 import json
 import os
 import re
@@ -67,7 +68,7 @@ def chunk(title: str, body: str) -> list[tuple[str, str]]:
 
 
 def variant() -> str:
-    return os.getenv("INGEST_VARIANT", "base")
+    return os.getenv("INGEST_VARIANT", "b")
 
 
 def _inline_fields(body: str) -> dict:
