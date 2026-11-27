@@ -18,6 +18,7 @@ from brain.webex import AccessDecision, release_pending
 
 MAX_STEPS = 6
 MAX_FACTS = 60
+_GENERIC_SUBJECT = re.compile(r"\b(user|caller|requester|requestor|myself|me|i|employee|hire|joiner|person|someone)\b", re.I)
 
 
 class State(TypedDict, total=False):
@@ -47,8 +48,9 @@ class State(TypedDict, total=False):
     fallbacks: list       # silent degradations that fired this turn (classify default plan, gather gave up)
 
 
-def _union(old, new):
-    return list(dict.fromkeys([*(old or []), *(new or [])]))[-MAX_FACTS:]  # ponytail: facts/constraints only grow
+def _union(old, new, cap: int | None = MAX_FACTS):
+    out = list(dict.fromkeys([*(old or []), *(new or [])]))
+    return out[-cap:] if cap else out  # facts keep the newest `cap`; constraints use cap=None: a user's rule is never dropped
 
 
 def _window(state):
@@ -97,7 +99,7 @@ async def classify(state: State, config) -> dict:
             closed.append(prev)
         facts.append(f"decision: closed - {plan.closes_topic}")
     return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "decision": None, "pause_now": False, "checklist": None, "facts": _union(facts, plan.relevant_facts),
-            "constraints": _union(state.get("constraints"), plan.relevant_constraints),
+            "constraints": _union(state.get("constraints"), plan.relevant_constraints, cap=None),
             "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": [],
             "fallbacks": fallbacks}
 
@@ -305,9 +307,10 @@ async def handoff(state: State, config) -> dict:
     # no "do not file" rule is in force (that escalates to humans and grants nothing). Both are regex heuristics.
     me = _employees(state).get(caller, "").lower()
     subj = plan.subject_name.strip()
-    # the planner's subject_name is free text ("user", "caller", "new hire in Customer Success"): it names ANOTHER
-    # person only if it reads like a name (capitalised) and is not the caller's own. A heuristic, tested.
-    about_me = not subj or subj.lower() in ("user", "me", "myself", "i", "caller", "requester", me, caller.lower()) or not subj[:1].isupper()
+    # the planner's subject_name is free text ("user", "caller", "new hire in Customer Success"). It names the caller
+    # (or nobody) when it is empty, one of those generic words, or the caller's own name or id. Anything else is a
+    # name: resolved case-insensitively against real employees, so "rachel stein" is Rachel, never the caller.
+    about_me = (not subj or bool(_GENERIC_SUBJECT.search(subj)) or subj.lower() in (me, caller.lower()))
     mine = (about_me and gate.self_request(state["message"]) and not gate.blocks_filing(state.get("constraints")))
     explicit = gate.consent_from_message(state["message"])
     if plan.intent == "access_request":  # why a write may or may not follow, visible without reading the regexes
@@ -321,13 +324,14 @@ async def handoff(state: State, config) -> dict:
         _io({"intent": plan.intent}, {"handoff": None}, reason="no consent for a handoff on this turn")
         return {"handoff": None}
     seen = _employees(state)
-    if not (mine and not gate.consent_from_message(state["message"])) and subj and not any(n.lower() == subj.lower() for n in seen.values()):
+    if not about_me and not any(n.lower() == subj.lower() for n in seen.values()):
         # the caller named someone no earlier lookup returned: code resolves them (exact full name), never the model
         for r in await cfg["toolbox"].call("get_employee", {"query": subj}):
             if isinstance(r, dict) and r.get("employee_id"):
                 seen[r["employee_id"]] = r["full_name"]
-    ids = [caller] if mine and not gate.consent_from_message(state["message"]) else [
-        i for i, n in seen.items() if plan.subject_name and n.lower() == plan.subject_name.lower()]
+    # about the caller only when they say so themselves ("I need Webex ... go ahead and file it"); a bare "go ahead" names nobody
+    ids = ([caller] if gate.self_request(state["message"]) else []) if about_me else [
+        i for i, n in seen.items() if n.lower() == subj.lower()]
     if len(ids) != 1 or not plan.system_name.strip():
         _io({"subject": plan.subject_name, "system": plan.system_name}, {"handoff": None},
             reason="subject did not resolve to exactly one employee or no system", matches=ids)

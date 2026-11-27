@@ -248,3 +248,29 @@ def test_third_party_subject_is_resolved_by_code_without_a_prior_lookup(scripted
     assert ap() == {"AP001": "pending", "AP002": "pending"}
     after = counts()
     assert (after["tickets"], after["access_requests"], after["approvals"]) == (before["tickets"], before["access_requests"], before["approvals"])
+
+
+# ---- #20: consent is one-use and bound to its draft ----
+def test_a_consumed_consent_cannot_be_used_again():
+    tools.record_consent("E010", "E010", "Webex", "m1", "d", AS_OF, gate.consent_token("E010", "E010", "Webex", "m1", "d"))
+    approve_rows()
+    assert tools.release_access("E010", "AR001", "m1", "c1", AS_OF)["status"] == "approved"
+    before = counts()
+    with pytest.raises(PermissionError, match="already used"):  # same consent, a new conversation: not a replay
+        tools.release_access("E010", "AR001", "m1", "c2", AS_OF)
+    with pytest.raises(PermissionError, match="already used"):
+        tools.request_approval("E010", "AP001", "m1", "c2", AS_OF)
+    assert counts() == before
+
+
+def test_consent_given_for_one_draft_does_not_cover_another():
+    tools.record_consent("E010", "E010", "Webex", "m1", "draft one", AS_OF,
+                         gate.consent_token("E010", "E010", "Webex", "m1", "draft one"))
+    with pytest.raises(PermissionError, match="different draft"):
+        tools.create_access_request("E010", "E010", "Webex", "draft two", "c1", AS_OF, "m1")
+    assert tools.create_access_request("E010", "E010", "Webex", "draft one", "c1", AS_OF, "m1")["entity_id"] == "AR001"
+
+
+def test_create_ticket_needs_consent_like_every_write():
+    with pytest.raises(PermissionError):
+        tools.create_ticket("E010", "E010", "Access", "Webex license", "s", "d", "Webex", "c1", AS_OF, "nope")

@@ -290,7 +290,8 @@ def _maya_then_ask(scripted, tmp_path, ask, thread, **plan_kw):
     from brain.handoff import PendingWebexPort
     scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya Cohen"}}', '{"done":true}', "Maya is E001.")
     turn("E004", "Pull up Maya Cohen's record.", thread, tmp_path, "UG_HR")
-    scripted(plan("access_request", False, subject_name="Maya Cohen", system_name="Webex", **plan_kw), "It is done.")
+    plan_kw.setdefault("subject_name", "Maya Cohen")
+    scripted(plan("access_request", False, system_name="Webex", **plan_kw), "It is done.")
     port = PendingWebexPort()
 
     async def go():
@@ -434,3 +435,43 @@ def test_one_failed_tool_keeps_the_evidence_and_the_turn_is_not_failed(scripted,
     r = turn("E010", "What is the personal laptop policy?", "t-fx", tmp_path)
     assert r.status == "completed" and r.sources == ["policies/byod_policy.md"]
     assert any("ERROR" in json.dumps(e["result"]) for e in r.extra["evidence"])  # the failure is in the evidence, not hidden
+
+
+# ---- #20: who a handoff is for, and constraints that must never be dropped ----
+def test_lowercase_subject_name_still_targets_that_person_not_the_caller(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "Go ahead and file the Webex access request for her now.", "t-l1",
+                                subject_name="maya cohen")
+    assert r.extra["handoff"]["subject_employee_id"] == "E001" and len(port.calls) == 1  # E001, not the caller E004
+
+
+def test_i_need_it_and_go_ahead_in_one_message_files_for_the_caller(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "I need Webex access too, go ahead and file it.", "t-l2", subject_name="")
+    assert r.extra["handoff"]["subject_employee_id"] == "E004" and len(port.calls) == 1
+
+
+def test_a_bare_go_ahead_names_nobody_so_nothing_is_filed(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "Go ahead and file the Webex request.", "t-l3", subject_name="")
+    assert r.extra["handoff"] is None and not port.calls
+
+
+def test_constraints_are_never_dropped_but_facts_are_capped():
+    from brain import graph
+    rules = ["do not file until I say so"] + [f"rule {i}" for i in range(100)]
+    assert "do not file until I say so" in graph._union([], rules, cap=None)
+    assert len(graph._union([], [f"f{i}" for i in range(100)])) == graph.MAX_FACTS
+
+
+def test_checklist_never_mixes_two_employees():
+    from brain import checklist
+    row = lambda who, tid: {"source": f"db:onboarding_tasks/{tid}", "task_id": tid, "employee_id": who, "status": "planned",  # noqa: E731
+                            "description": "Laptop"}
+    ev = [{"tool": "list_onboarding_tasks", "args": {"employee_id": "E001"}, "result": [row("E001", "OT001")]},
+          {"tool": "list_onboarding_tasks", "args": {"employee_id": "E020"}, "result": [row("E020", "OT900")]}]
+    cl = checklist.build(ev)
+    assert cl.employee_id == "E001" and [i.task_id for i in cl.items] == ["OT001"]
+
+
+def test_a_lowercase_name_in_a_self_style_request_is_not_the_caller(scripted, tmp_path):
+    # "I need ... for maya cohen" used to read as the caller asking for themselves (lowercase = "not a name"): E004 got the request
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "I need Webex access set up for maya cohen.", "t-l4", subject_name="maya cohen")
+    assert r.extra["handoff"] is None and not port.calls  # someone else's request needs an explicit go-ahead
