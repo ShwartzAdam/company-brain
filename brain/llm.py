@@ -9,6 +9,7 @@ from langfuse import get_client, observe
 from brain import config
 
 _backend = None  # tests install a fake via set_backend()
+MAX_RETRY_TOKENS = 4000
 
 
 class BedrockBackend:
@@ -95,14 +96,15 @@ def structured(messages: list[dict], system: str, schema: dict, name: str = "res
     fakes) answers through complete() and the JSON is pulled from its text; the schema check is the same."""
     b, last = _get(), None
     for _ in range(retries + 1):  # `_` is the attempt number, recorded on the generation
-        try:
+        room = min(MAX_RETRY_TOKENS, max_tokens * 2 ** _)  # a forced call cut off by the token cap comes back as
+        try:                                                # `malformed_tool_use`: each retry gets twice the room
             if hasattr(b, "structured"):
-                out = b.structured(messages, system, name, schema, max_tokens, min(0.3, temperature + 0.15 * _))  # a malformed forced call repeats at temperature 0
+                out = b.structured(messages, system, name, schema, room, min(0.3, temperature + 0.15 * _))  # a malformed forced call repeats at temperature 0
             else:
                 out = _json_from_text(b.complete(messages, system, max_tokens, temperature))
             jsonschema.validate(out, schema)
             get_client().update_current_generation(
-                name=f"llm.structured:{name}", metadata={"attempts": _ + 1},
+                name=f"llm.structured:{name}", metadata={"attempts": _ + 1, "max_tokens_used": room},
                 input=[{"role": "system", "content": system}] + messages, output=out, model=config.MODEL_ID,
                 model_parameters={"max_tokens": max_tokens, "temperature": temperature, "forced_tool": name},
                 usage_details=getattr(b, "last_usage", None))

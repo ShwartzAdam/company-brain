@@ -75,7 +75,7 @@ async def classify(state: State, config) -> dict:
     msgs = classify_prompt(_window(state), state["message"], state.get("facts"), state.get("constraints"))
     fallbacks = []
     try:
-        plan = parse_plan(llm.structured(msgs, CLASSIFY_SYSTEM, PLAN_SCHEMA, name="classify", max_tokens=500))
+        plan = parse_plan(llm.structured(msgs, CLASSIFY_SYSTEM, PLAN_SCHEMA, name="classify", max_tokens=1000))
     except ValueError as e:  # no valid plan twice: fail open for reads only, and SAY SO in the trace
         plan = TurnPlan()
         fallbacks.append("classify_default_plan")
