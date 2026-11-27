@@ -551,3 +551,39 @@ def test_forced_search_for_a_pronoun_question_puts_the_person_in_the_query(scrip
     assert "forced_document_search" in r.extra["fallbacks"]  # \"offer letter\" is a document, so code made sure it was searched
     assert seen and seen[-1].startswith("Maya Cohen ") and "offer letter" in seen[-1]
     assert "documents/employment/maya_cohen_offer_letter.md" in r.sources
+
+
+# ---- classify: a forced call cut off by the token cap is retried with more room, not defaulted ----
+def test_structured_retries_with_more_tokens_when_the_forced_call_is_cut_off():
+    from brain import llm
+
+    class Cutoff:
+        def __init__(self):
+            self.seen = []
+
+        def structured(self, messages, system, name, schema, max_tokens, temperature):
+            self.seen.append(max_tokens)
+            if max_tokens < 900:  # what Bedrock does when the tool-call JSON does not fit: no tool call at all
+                raise ValueError("model returned no tool call (stopReason=malformed_tool_use, text='')")
+            return {"intent": "other"}
+    b = Cutoff()
+    llm.set_backend(b)
+    try:
+        out = llm.structured([{"role": "user", "content": "x"}], "s", {"type": "object"}, name="classify", max_tokens=500)
+    finally:
+        llm.set_backend(None)
+    assert out == {"intent": "other"} and b.seen == [500, 1000]
+
+
+def test_structured_still_gives_up_after_its_retries():
+    from brain import llm
+
+    class Never:
+        def structured(self, *a, **kw):
+            raise ValueError("model returned no tool call (stopReason=malformed_tool_use, text='')")
+    llm.set_backend(Never())
+    try:
+        with pytest.raises(ValueError, match="no valid"):
+            llm.structured([{"role": "user", "content": "x"}], "s", {"type": "object"}, name="classify")
+    finally:
+        llm.set_backend(None)
