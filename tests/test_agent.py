@@ -374,3 +374,43 @@ def test_evidence_shrink_keeps_every_source_whole():
     out = graph._evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
     assert all(r["source"] in out for r in rows)  # the old [:1500] cut a source in half
     assert len(out) < 4000
+
+
+# ---- #18: bounded calls, a turn never raises ----
+def test_hung_tool_call_times_out_and_the_turn_is_failed(scripted, tmp_path, monkeypatch):
+    from brain import config
+    monkeypatch.setattr(config, "TOOL_TIMEOUT_S", 0.2)
+
+    async def hang(*a, **kw):
+        await asyncio.sleep(30)
+    monkeypatch.setattr("mcp.client.session.ClientSession.call_tool", hang)
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}', "x")
+    r = turn("E010", "my tickets", "t-hang", tmp_path)
+    assert r.status == "failed" and "timed out" in r.error and status.answer_agrees(r.status, r.answer)
+
+
+def test_hung_graph_is_failed_by_the_turn_timeout(scripted, tmp_path, monkeypatch):
+    from brain import config, graph
+    monkeypatch.setattr(config, "TURN_TIMEOUT_S", 0.2)
+
+    async def hang(*a, **kw):
+        await asyncio.sleep(30)
+    monkeypatch.setattr(graph, "classify", hang, raising=False)
+    monkeypatch.setattr(agent.graph, "build_graph", lambda saver: type("G", (), {
+        "aget_state": staticmethod(lambda cfg: _vals()), "ainvoke": staticmethod(hang)})())
+    r = turn("E010", "hello", "t-hang2", tmp_path)
+    assert r.status == "failed" and "timed out" in r.error and r.request_id
+
+
+def test_an_exception_in_the_graph_is_failed_not_raised(tmp_path, monkeypatch):
+    async def boom(*a, **kw):
+        raise KeyError("state broke")
+    monkeypatch.setattr(agent.graph, "build_graph", lambda saver: type("G", (), {
+        "aget_state": staticmethod(lambda cfg: _vals()), "ainvoke": staticmethod(boom)})())
+    r = turn("E010", "hello", "t-boom", tmp_path)
+    assert r.status == "failed" and "KeyError" in r.error and status.answer_agrees(r.status, r.answer)
+
+
+async def _vals():
+    from types import SimpleNamespace
+    return SimpleNamespace(values={})

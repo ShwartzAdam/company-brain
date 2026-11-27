@@ -26,6 +26,7 @@ class TurnResult:
     trace_id: str = ""   # the Langfuse trace of this turn: the id the submission index lists
 
 
+FAILED_ANSWER = "I couldn't finish this request because of an internal error or timeout, so nothing was done. Please try again."
 CHECKPOINT_DB = config.ROOT / "state" / "agent.db"
 
 
@@ -66,11 +67,13 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
             try:
                 with propagate_attributes(session_id=thread_id, user_id=caller_id, metadata=identity, environment=environment,
                                           tags=["novaops", "turn"]):
-                    out = await g.ainvoke({"message": message}, cfg)
-            except Exception as e:  # noqa: BLE001
-                lf.update_current_span(output=f"failed: {e}"[:300], level="ERROR", status_message=str(e)[:300],
-                                       metadata={**identity, "status": "failed", "error": str(e)[:300]})
-                raise
+                    out = await asyncio.wait_for(g.ainvoke({"message": message}, cfg), config.TURN_TIMEOUT_S)
+            except Exception as e:  # noqa: BLE001  (a timeout is one too): a turn never raises, it ends `failed`
+                why = (f"turn timed out after {config.TURN_TIMEOUT_S:g}s" if isinstance(e, asyncio.TimeoutError)
+                       else f"{type(e).__name__}: {e}")[:300]
+                lf.update_current_span(output=f"failed: {why}", level="ERROR", status_message=why,
+                                       metadata={**identity, "status": "failed", "error": why})
+                return TurnResult(FAILED_ANSWER, "failed", "", [], [], [], "", request_id, why, trace_id=trace_id)
             r = TurnResult(out["answer"], out["status"], out["scope"], out["visible"],
                            [t["tool"] for t in out["tool_log"]], out["sources"], out["plan"]["intent"],
                            request_id, out["error"],

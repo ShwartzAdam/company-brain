@@ -14,7 +14,10 @@ _backend = None  # tests install a fake via set_backend()
 class BedrockBackend:
     def __init__(self):
         import boto3
-        self._c = boto3.client("bedrock-runtime", region_name=config.REGION)
+        from botocore.config import Config
+        cfg = Config(connect_timeout=config.BEDROCK_CONNECT_TIMEOUT_S, read_timeout=config.BEDROCK_READ_TIMEOUT_S,
+                     retries={"max_attempts": config.BEDROCK_MAX_ATTEMPTS, "mode": "standard"})
+        self._c = boto3.client("bedrock-runtime", region_name=config.REGION, config=cfg)
 
     def complete(self, messages, system, max_tokens, temperature):
         r = self._c.converse(
