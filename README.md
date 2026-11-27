@@ -62,7 +62,7 @@ See also `PLAN-VALIDATION.md` and `KNOWN-TRAPS.md`.
 
 ## Step 3: Maya (HR and onboarding)
 
-Built and verified **offline** (66 pytest tests, scripted fake model, no AWS). The full live evaluation (`evals/session_replay.py`, `evals/maya_checks.py`) has not been run on this code yet; the numbers in `evals/results/` are from earlier code.
+Built and verified **offline** (112 pytest tests, scripted fake model, no AWS). The full live evaluation (`evals/session_replay.py`, `evals/maya_checks.py`) has not been run on this code yet; the numbers in `evals/results/` are from earlier code.
 
 - **Memory** is written by code, never by the model: facts come from the user's words (classify) and from tool rows (`db:<table>/<id>` sources, plus the top three document passages). The assistant's own sentences are never stored as facts. We chose this over the lesson's LLM distiller because the lesson's own results show distillation lowering task success; add a distiller only if context grows too large.
 - **Closed topics:** when the user drops a topic the plan sets `closes_topic`; code removes that topic's rows and raw turns and keeps one `decision: closed - ...` line, so "who was in my first question?" still works. A later turn on the same intent reopens it.
@@ -140,3 +140,6 @@ Read by hand against `KNOWN-TRAPS.md`; stage attribution comes from the traces (
 - **Numbered citation `[1]`** on M-S-01 t8 and a non-manager asking about the manager's guide (M-S-02 t4) gets handbook text without being told the guide is restricted.
 - **Classify's forced tool call can come back `malformed_tool_use`** on long prompts (M-S-01 t12 "write the full status summary", M-S-02 t4). It is retried twice with a small temperature bump; M-S-01 t12 still fell back to the default plan. The fallback is flagged in the trace (`fallbacks: classify_default_plan`, WARNING span) and the answer is still produced. Candidate fix: retry that failure in plain JSON mode.
 - Not diagnosed: W-I-02 (passed in the rehearsal, 1/3 in Step 4), S6/S7/S8 turns 1-3 (need the 3-run replay). The typo cause of the missing `E010` ("rrachel stein") is fixed and tested.
+
+## Timeouts and failed turns
+Every call that can hang is bounded (`brain/config.py`, overridable in `.env`): the Bedrock client (`BEDROCK_CONNECT_TIMEOUT_S`, `BEDROCK_READ_TIMEOUT_S`, `BEDROCK_MAX_ATTEMPTS`), each MCP tool call (`TOOL_TIMEOUT_S`) and a whole turn (`TURN_TIMEOUT_S`). A timeout or any exception in a turn returns a `TurnResult` with status `failed` and the reason in `error` and on the `agent.turn` span; `handle_turn` does not raise. `evals/run_submission.py` also bounds each turn (`RUN_TURN_TIMEOUT_S`), records a failed turn as a `failed` row and continues, and rewrites `evals/results/submission-*.json` after every turn. The replay scripts get the turn bound from `handle_turn`; they still write at the end.
