@@ -26,6 +26,13 @@ class TurnResult:
     trace_id: str = ""   # the Langfuse trace of this turn: the id the submission index lists
 
 
+def failed_result(request_id: str, why: str, trace_id: str = "") -> TurnResult:
+    """A turn that broke (timeout, tool or model error) still answers, honestly: nothing was done, and status says so."""
+    return TurnResult("I could not complete this request because of a system error, and nothing was changed. "
+                      "Please try again, or ask a person to look into it.", "failed", "", [], [], [], "other",
+                      request_id, why, trace_id=trace_id)
+
+
 CHECKPOINT_DB = config.ROOT / "state" / "agent.db"
 
 
@@ -66,11 +73,13 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
             try:
                 with propagate_attributes(session_id=thread_id, user_id=caller_id, metadata=identity, environment=environment,
                                           tags=["novaops", "turn"]):
-                    out = await g.ainvoke({"message": message}, cfg)
-            except Exception as e:  # noqa: BLE001
-                lf.update_current_span(output=f"failed: {e}"[:300], level="ERROR", status_message=str(e)[:300],
-                                       metadata={**identity, "status": "failed", "error": str(e)[:300]})
-                raise
+                    out = await asyncio.wait_for(g.ainvoke({"message": message}, cfg), config.TURN_TIMEOUT_S)
+            except Exception as e:  # noqa: BLE001  (a timeout is one too) a broken turn is a `failed` result, never an escaping error
+                why = (f"turn timed out after {config.TURN_TIMEOUT_S}s" if isinstance(e, asyncio.TimeoutError)
+                       else f"{type(e).__name__}: {e}")[:300]
+                lf.update_current_span(output=f"failed: {why}", level="ERROR", status_message=why,
+                                       metadata={**identity, "status": "failed", "error": why})
+                return failed_result(request_id, why, trace_id)
             r = TurnResult(out["answer"], out["status"], out["scope"], out["visible"],
                            [t["tool"] for t in out["tool_log"]], out["sources"], out["plan"]["intent"],
                            request_id, out["error"],
@@ -123,7 +132,11 @@ async def aresume_pending(caller_id: str, caller_group: str, thread_id: str, as_
             cfg = {"configurable": {"thread_id": thread_id, "toolbox": box, "as_of": as_of, "request_id": rid}}
             with propagate_attributes(session_id=thread_id, user_id=caller_id, metadata=identity, environment=environment,
                                       tags=["novaops", "resume"]):
-                r = await _resume(box, g, cfg, st, pend, Command)
+                try:
+                    r = await asyncio.wait_for(_resume(box, g, cfg, st, pend, Command), config.TURN_TIMEOUT_S)
+                except Exception as e:  # noqa: BLE001  same rule as a turn: a broken resume is `failed`, and nothing was released twice
+                    r = failed_result(rid, (f"resume timed out after {config.TURN_TIMEOUT_S}s" if isinstance(e, asyncio.TimeoutError)
+                                            else f"{type(e).__name__}: {e}")[:300])
             r.trace_id = box.ctx["trace_id"]
             lf.update_current_span(output=r.answer, metadata={**identity, "status": r.status, "scope": "webex",
                                                               "paused": r.status == "pending", "pending": list(pend)})

@@ -61,8 +61,12 @@ def fill(md: str, ids: dict) -> str:
     return re.sub(r"^\| `([A-Z]-[IS]-\d\d)` \| (—|\d+) \|[ ]*\|$", row, md, flags=re.M)
 
 
-async def run_all(turns, handle, reset, prefix="", environment=None, ck=None):
-    """Sequential, in order. -> rows [{item, turn, thread, trace_id, status, request_id}]."""
+async def run_all(turns, handle, reset, prefix="", environment=None, ck=None, save=None, turn_timeout=None):
+    """Sequential, in order. -> rows [{item, turn, thread, trace_id, status, request_id}].
+    One broken or stuck turn becomes a `failed` row and the run goes on; `save(rows)` runs after EVERY turn, so a crash
+    keeps what finished."""
+    from brain import config
+    limit = turn_timeout or config.TURN_TIMEOUT_S + 30   # the agent's own limit fires first; this is the backstop
     rows, last = [], None
     for t in turns:
         if t["item"] != last:  # a new item: independent database and conversation
@@ -70,11 +74,20 @@ async def run_all(turns, handle, reset, prefix="", environment=None, ck=None):
             if ck:
                 Path(ck).unlink(missing_ok=True)
             last = t["item"]
-        r = await handle(t["caller"], t["group"], prefix + t["thread"], t["message"], AS_OF, case_id=t["item"],
-                         turn=t["turn"] if t["turn"] is not None else 1, environment=environment)
-        rows.append({"item": t["item"], "turn": t["turn"], "thread": prefix + t["thread"], "trace_id": r.trace_id,
-                     "status": r.status, "request_id": r.request_id, "intent": r.intent})
-        print(f"{t['item']} t{t['turn'] or '-'} {r.status:11} {r.intent:18} trace={r.trace_id[:8] or '(none)'}")
+        row = {"item": t["item"], "turn": t["turn"], "thread": prefix + t["thread"], "trace_id": "", "status": "failed",
+               "request_id": "", "intent": "other"}
+        try:
+            r = await asyncio.wait_for(handle(t["caller"], t["group"], prefix + t["thread"], t["message"], AS_OF,
+                                              case_id=t["item"], turn=t["turn"] if t["turn"] is not None else 1,
+                                              environment=environment), limit)
+            row |= {"trace_id": r.trace_id, "status": r.status, "request_id": r.request_id, "intent": r.intent}
+        except Exception as e:  # noqa: BLE001  includes the backstop timeout
+            row["error"] = f"{type(e).__name__}: {e}"[:300]
+        rows.append(row)
+        print(f"{t['item']} t{t['turn'] or '-'} {row['status']:11} {row['intent']:18} trace={row['trace_id'][:8] or '(none)'}"
+              + (f"  ERROR {row['error']}" if row.get("error") else ""))
+        if save:
+            save(rows)
     return rows
 
 
@@ -91,7 +104,7 @@ class DryBackend:
         return [0.0] * 1024
 
 
-def dry_run(turns) -> list[dict]:
+def dry_run(turns, save=None) -> list[dict]:
     """The whole path with a fake model, tracing off, in-memory MCP. Trace ids are synthetic: dry-<request id>."""
     os.environ["LANGFUSE_TRACING_ENABLED"] = "false"
     os.environ["BRAIN_DB_PATH"] = tempfile.mkdtemp() + "/dry.db"
@@ -110,14 +123,14 @@ def dry_run(turns) -> list[dict]:
                 r = await agent.ahandle_turn(caller, group, thread, msg, as_of, toolbox=box, checkpoint_path=ck, **kw)
                 r.trace_id = r.trace_id or f"dry-{r.request_id}"
                 return r
-            return await run_all(turns, handle, db.reset_db, ck=ck)
+            return await run_all(turns, handle, db.reset_db, ck=ck, save=save)
     try:
         return asyncio.run(go())
     finally:
         llm.set_backend(None)
 
 
-def live(turns, environment: str, prefix: str):
+def live(turns, environment: str, prefix: str, save=None):
     os.environ["LANGFUSE_TRACING_ENVIRONMENT"] = environment  # before the Langfuse client is created
     import webex_replay as wr  # sets MCP_PORT / BRAIN_DB_PATH for a private server and database
     from dotenv import load_dotenv
@@ -132,7 +145,7 @@ def live(turns, environment: str, prefix: str):
     try:
         async def handle(*a, **kw):
             return await agent.ahandle_turn(*a, checkpoint_path=ck, **kw)
-        rows = asyncio.run(run_all(turns, handle, db.reset_db, prefix=prefix, environment=environment, ck=ck))
+        rows = asyncio.run(run_all(turns, handle, db.reset_db, prefix=prefix, environment=environment, ck=ck, save=save))
     finally:
         server.terminate()
     lf.flush()
@@ -172,11 +185,14 @@ def main():
         turns, a.fill = [t for t in turns if t["item"] in a.items], None
     print(f"{len(turns)} traces planned: {c}")
     env = "submission" if a.submit else "rehearsal"
-    rows = dry_run(turns) if a.dry_run else live(turns, env, "" if a.submit else "rehearsal-")
-    ids = {(r["item"], r["turn"]): r["trace_id"] for r in rows}
     out = ROOT / "evals" / "results" / f"submission-{'dry' if a.dry_run else env}{'-partial' if a.items else ''}.json"
     out.parent.mkdir(exist_ok=True)
-    out.write_text(json.dumps(rows, indent=1))
+
+    def save(rows):  # after every turn: a crash or a Ctrl-C keeps everything that finished
+        out.write_text(json.dumps(rows, indent=1))
+    rows = dry_run(turns, save) if a.dry_run else live(turns, env, "" if a.submit else "rehearsal-", save)
+    ids = {(r["item"], r["turn"]): r["trace_id"] for r in rows}
+    save(rows)
     if a.dry_run:
         print(f"dry run ok: {len(rows)} turns, {len({r['thread'] for r in rows})} threads -> {out.name}")
         return

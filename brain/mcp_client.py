@@ -1,5 +1,6 @@
 """The graph's only way to reach tools: an MCP session. Never imports brain.db/tools/retrieval.
 caller_id is injected here from the application's argument, whatever the model wrote."""
+import asyncio
 import contextlib
 import json
 
@@ -54,9 +55,13 @@ class Toolbox:
             # the server reads these and opens server.<tool> under THIS span, in the same trace
             meta |= {"trace_id": lf.get_current_trace_id(), "parent_span_id": lf.get_current_observation_id()}
             try:
-                res = await self.s.call_tool(name, args, meta={k: v for k, v in meta.items() if v})
+                res = await asyncio.wait_for(self.s.call_tool(name, args, meta={k: v for k, v in meta.items() if v}),
+                                             config.TOOL_TIMEOUT_S)  # a hung tool ends this call, not the run
                 if res.isError:
                     raise RuntimeError(" ".join(getattr(c, "text", "") for c in res.content)[:300])
+            except asyncio.TimeoutError:
+                sp.update(level="ERROR", status_message=f"tool {name} timed out after {config.TOOL_TIMEOUT_S}s")
+                raise TimeoutError(f"tool {name} timed out after {config.TOOL_TIMEOUT_S}s") from None
             except Exception as e:
                 sp.update(level="ERROR", status_message=str(e)[:300])
                 raise
