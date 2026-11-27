@@ -105,6 +105,7 @@ def run_case(c: dict, run: int, ck: Path) -> dict:
         if done.status != "needs_human" or rel != 1:
             out["fails"].append(f"resume after approval: status {done.status}, release events {rel}")
         out["fails"] += wc.check_never_granted(done.answer, None, "approved", approvals())
+        out["fails"] += wc.check_write_needs_consent([r["key"] for r in db.rows("SELECT key FROM write_keys")], consent_rows())
         out["ok"] = not out["fails"]
     print(f"{tid} {'FAIL' if out['fails'] else 'ok  '} intent={r.intent} status={r.status} tools={r.tool_sequence} {out['fails'] or ''} {r.error}")
     return out
