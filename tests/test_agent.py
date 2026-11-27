@@ -533,3 +533,21 @@ def test_an_exception_in_the_graph_is_failed_not_raised(tmp_path, monkeypatch):
 async def _vals():
     from types import SimpleNamespace
     return SimpleNamespace(values={})
+
+
+# ---- offer-letter miss: a forced search names the person a pronoun stands for ----
+def test_forced_search_for_a_pronoun_question_puts_the_person_in_the_query(scripted, monkeypatch, tmp_path):
+    seen = []
+
+    def fake(query, caller_id, k=5, corpus=None, **kw):
+        seen.append(query)
+        return [{"source": "documents/employment/maya_cohen_offer_letter.md", "text": "Equipment entitlement: laptop, monitor",
+                 "section": "s", "audience": "all", "score": 1.0}]
+    monkeypatch.setattr(retrieval, "search", fake)
+    scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya Cohen"}}', '{"done":true}', "Maya is E001.")
+    turn("E004", "Pull up Maya Cohen's record.", "t-ol", tmp_path, "UG_HR")
+    scripted(plan("onboarding_status"), '{"done":true}', "Her letter lists a laptop [documents/employment/maya_cohen_offer_letter.md].")
+    r = turn("E004", "What does her offer letter say she needs on day one?", "t-ol", tmp_path, "UG_HR")
+    assert "forced_document_search" in r.extra["fallbacks"]  # \"offer letter\" is a document, so code made sure it was searched
+    assert seen and seen[-1].startswith("Maya Cohen ") and "offer letter" in seen[-1]
+    assert "documents/employment/maya_cohen_offer_letter.md" in r.sources

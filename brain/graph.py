@@ -124,7 +124,17 @@ GATHER_SYSTEM = (
 
 EVIDENCE_CHARS = 12000  # the whole evidence block. 8 whole-document results are about 1400 characters each
 MIN_ITEM_CHARS = 1500   # no single result is squeezed below this, however many there are
-_DOC_WORDS = re.compile(r"polic|rule|threshold|handbook|document|memo|article|eligib|guideline|procedure|contract term", re.I)
+_DOC_WORDS = re.compile(r"polic|rule|threshold|handbook|document|memo|article|eligib|guideline|procedure|contract term|"
+                        r"letter|addendum|agreement|summary|statement of work|profile|\boffer\b|\bform\b", re.I)
+_PRONOUN = re.compile(r"\b(her|his|she|he|their|they|them)\b", re.I)
+
+
+def _search_query(state) -> str:
+    """The user's own words for a forced search. A pronoun ('her offer letter') names nobody to a search engine, so the
+    person most recently seen in this conversation (a database row, never the model's prose) is put in front."""
+    q = gate.top_level(state["message"]).strip()[:300]
+    names = list(_employees(state).values())
+    return f"{names[-1]} {q}" if names and _PRONOUN.search(q) else q
 
 
 def _shrink(result, limit: int = EVIDENCE_CHARS):
@@ -234,9 +244,10 @@ async def gather(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
     if (plan.requires_tools and "search_documents" in visible and not error
             and not any(t["tool"] == "search_documents" and not t.get("rejected") and not t.get("failed") for t in log)
-            and (plan.intent == "policy_question" or any(_DOC_WORDS.search(x) for x in needed))):
+            and (plan.intent == "policy_question" or any(_DOC_WORDS.search(x) for x in needed)
+                 or _DOC_WORDS.search(gate.top_level(state["message"])))):
         # code enforces what classify asked for: a question that needs a document is not answered without a search
-        args = {"query": gate.top_level(state["message"]).strip()[:300]}
+        args = {"query": _search_query(state)}
         fallbacks.append("forced_document_search")
         try:
             res = await box.call("search_documents", args)

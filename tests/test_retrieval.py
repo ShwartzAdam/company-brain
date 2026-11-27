@@ -99,3 +99,34 @@ def test_variant_c_corpus_is_a_preference_not_a_wall(monkeypatch):
 
     out = retrieval.search("q", "E010", k=3, corpus="policies", os_client=C())
     assert seen["corpus"] is None and out[0] == "policies" and "contracts" in out
+
+
+class _Corpora:
+    """Fake index: a corpus-filtered query only sees that corpus; an unfiltered one sees everything (best match first)."""
+    def __init__(self):
+        self.bodies = []
+        self.docs = [_hit(1, "contracts", "documents/contracts/bamboohr.md"), _hit(2, "contracts", "documents/contracts/deel.md"),
+                     _hit(3, "employment", "documents/employment/maya_cohen_offer_letter.md")]
+
+    def search(self, index, body):
+        self.bodies.append(body)
+        only = "contracts" if "{'term': {'corpus': 'contracts'}}" in str(body) else None
+        return {"hits": {"hits": [d for d in self.docs if only in (None, d["_source"]["corpus"])]}}
+
+
+def test_a_wrong_corpus_guess_does_not_hide_the_document(fake_llm):
+    fake_llm.reply = "[2, 0, 1]"  # the model reranker puts the offer letter first
+    cap = _Corpora()
+    out = retrieval.search("Maya Cohen offer letter day one", "E004", k=5, corpus="contracts", os_client=cap)
+    srcs = [h["source"] for h in out]
+    assert "documents/employment/maya_cohen_offer_letter.md" in srcs  # the old hard filter returned only contracts
+    assert srcs[0].startswith("documents/contracts/")                 # the preferred corpus still comes first
+    assert any("{'term': {'corpus': 'contracts'}}" in str(b) for b in cap.bodies)  # the preferred corpus was searched ...
+    assert any("{'term': {'corpus'" not in str(b) for b in cap.bodies)               # ... and so was the whole index
+
+
+def test_widening_a_corpus_never_widens_the_audience(fake_llm):
+    for who, is_mgr in (("E010", False), ("E018", True)):
+        cap = _Corpora()
+        retrieval.search("guide", who, k=5, corpus="manager_playbook", os_client=cap)
+        assert cap.bodies and all(("'audience': 'all'" in str(b)) != is_mgr for b in cap.bodies), who

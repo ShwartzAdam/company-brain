@@ -176,6 +176,15 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
         if corpus:  # the requested corpus first, the rest after
             hits = sorted(hits, key=lambda h: h["_source"].get("corpus") != corpus)
         return _result(hits, query, caller_id, mode, k, corpus)
+    if mode == "rerank" and corpus:
+        # `corpus` is a preference, not a wall (the model guesses it, and a wrong guess such as 'contracts' for an offer letter
+        # hid the letter completely): the preferred corpus feeds the pool first, the whole index feeds it too. The audience
+        # filter is in every query, so widening never reaches a restricted document.
+        pref = rrf([q(build_body(query, caller_id, POOL, corpus)), q(build_keyword_body(query, caller_id, POOL, corpus))])
+        wide = rrf([q(build_body(query, caller_id, POOL, None)), q(build_keyword_body(query, caller_id, POOL, None))])
+        pool = list({h["_id"]: h for h in pref[:POOL // 2] + wide}.values())[:POOL]
+        hits = sorted(rerank(query, pool, k), key=lambda h: h["_source"].get("corpus") != corpus)  # preferred corpus first
+        return _result(hits, query, caller_id, mode, k, corpus)
     vec = q(build_body(query, caller_id, POOL if mode != "vector" else k, corpus))
     if mode == "vector":
         hits = vec[:k]
