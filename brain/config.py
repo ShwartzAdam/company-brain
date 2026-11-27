@@ -22,9 +22,10 @@ INDEX_NAME = os.getenv("OPENSEARCH_INDEX", "company-brain-docs")
 MCP_HOST, MCP_PORT = "127.0.0.1", int(os.getenv("MCP_PORT", "9890"))
 MCP_URL = f"http://{MCP_HOST}:{MCP_PORT}/mcp"
 
-# Time limits. A stuck call must end a turn as `failed`, never hang a run (a replay once hung 2.5 hours).
+# Bounds on every call that can hang (seconds). Overridable from .env.
+TOOL_TIMEOUT_S = float(os.getenv("TOOL_TIMEOUT_S", "60"))        # one MCP tool call
+TURN_TIMEOUT_S = float(os.getenv("TURN_TIMEOUT_S", "240"))       # one whole graph run (a turn)
+RUN_TURN_TIMEOUT_S = float(os.getenv("RUN_TURN_TIMEOUT_S", str(TURN_TIMEOUT_S + 60)))  # eval runner's outer bound
 BEDROCK_CONNECT_TIMEOUT_S = float(os.getenv("BEDROCK_CONNECT_TIMEOUT_S", "10"))
 BEDROCK_READ_TIMEOUT_S = float(os.getenv("BEDROCK_READ_TIMEOUT_S", "60"))
 BEDROCK_MAX_ATTEMPTS = int(os.getenv("BEDROCK_MAX_ATTEMPTS", "3"))
-TOOL_TIMEOUT_S = float(os.getenv("TOOL_TIMEOUT_S", "60"))      # one MCP tool call
-TURN_TIMEOUT_S = float(os.getenv("TURN_TIMEOUT_S", "240"))     # one whole turn (classify, tools, answer)

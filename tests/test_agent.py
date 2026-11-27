@@ -475,3 +475,61 @@ def test_a_lowercase_name_in_a_self_style_request_is_not_the_caller(scripted, tm
     # "I need ... for maya cohen" used to read as the caller asking for themselves (lowercase = "not a name"): E004 got the request
     port, r, _ = _maya_then_ask(scripted, tmp_path, "I need Webex access set up for maya cohen.", "t-l4", subject_name="maya cohen")
     assert r.extra["handoff"] is None and not port.calls  # someone else's request needs an explicit go-ahead
+
+
+
+
+# ---- #18: bounded calls, a turn never raises ----
+def test_hung_tool_calls_time_out_and_a_second_one_fails_the_turn(scripted, tmp_path, monkeypatch):
+    from brain import config
+    monkeypatch.setattr(config, "TOOL_TIMEOUT_S", 0.2)
+
+    async def hang(*a, **kw):
+        await asyncio.sleep(30)
+    monkeypatch.setattr("mcp.client.session.ClientSession.call_tool", hang)
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}',
+             '{"tool":"list_employee_tickets","args":{"employee_id":"E009"}}', '{"done":true}', "x")
+    r = turn("E010", "my tickets", "t-hang", tmp_path)  # two timeouts in one turn: give up (#19: one failure alone does not)
+    assert r.status == "failed" and "timed out" in r.error and status.answer_agrees(r.status, r.answer)
+
+
+def test_one_hung_tool_call_is_reported_in_the_answer_not_hidden(scripted, tmp_path, monkeypatch):
+    from brain import config
+    monkeypatch.setattr(config, "TOOL_TIMEOUT_S", 0.2)
+
+    async def hang(*a, **kw):
+        await asyncio.sleep(30)
+    monkeypatch.setattr("mcp.client.session.ClientSession.call_tool", hang)
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}',
+             '{"done":true}',  # the failed call counts as no lookup, so gather is re-armed once and the model stops again
+             "I could not look up the tickets: the tool timed out.")
+    r = turn("E010", "my tickets", "t-hang1", tmp_path)
+    assert r.status == "completed" and "tool_failed:list_employee_tickets" in r.extra["fallbacks"]
+    assert any("timed out" in json.dumps(e["result"]) for e in r.extra["evidence"])
+
+
+def test_hung_graph_is_failed_by_the_turn_timeout(scripted, tmp_path, monkeypatch):
+    from brain import config, graph
+    monkeypatch.setattr(config, "TURN_TIMEOUT_S", 0.2)
+
+    async def hang(*a, **kw):
+        await asyncio.sleep(30)
+    monkeypatch.setattr(graph, "classify", hang, raising=False)
+    monkeypatch.setattr(agent.graph, "build_graph", lambda saver: type("G", (), {
+        "aget_state": staticmethod(lambda cfg: _vals()), "ainvoke": staticmethod(hang)})())
+    r = turn("E010", "hello", "t-hang2", tmp_path)
+    assert r.status == "failed" and "timed out" in r.error and r.request_id
+
+
+def test_an_exception_in_the_graph_is_failed_not_raised(tmp_path, monkeypatch):
+    async def boom(*a, **kw):
+        raise KeyError("state broke")
+    monkeypatch.setattr(agent.graph, "build_graph", lambda saver: type("G", (), {
+        "aget_state": staticmethod(lambda cfg: _vals()), "ainvoke": staticmethod(boom)})())
+    r = turn("E010", "hello", "t-boom", tmp_path)
+    assert r.status == "failed" and "KeyError" in r.error and status.answer_agrees(r.status, r.answer)
+
+
+async def _vals():
+    from types import SimpleNamespace
+    return SimpleNamespace(values={})

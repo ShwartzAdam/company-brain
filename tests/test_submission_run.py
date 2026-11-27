@@ -58,3 +58,22 @@ def test_the_real_set_is_27_and_a_dry_run_replays_all_of_it_on_the_right_threads
     sess = [r for r in rows if r["item"] == "M-S-01"]
     assert len(sess) == 12 and len({r["thread"] for r in sess}) == 1  # one thread, so turn 12 can see turn 1
     assert len({r["thread"] for r in rows if r["turn"] is None}) == 6  # every one-shot input starts its own thread
+
+
+def test_run_all_survives_a_hung_and_a_raising_turn_and_saves_after_every_turn():
+    import asyncio
+    from types import SimpleNamespace
+    turns = [rs._turn("maya", f"M-I-0{i}", None, {"employee_id": "E010", "group": "Regular Employee"}, "hi") for i in range(1, 4)]
+    saved = []
+
+    async def handle(caller, group, thread, msg, as_of, **kw):
+        if thread == "M-I-01":
+            await asyncio.sleep(30)
+        if thread == "M-I-02":
+            raise RuntimeError("boom")
+        return SimpleNamespace(trace_id="abcdef123", status="completed", intent="other", request_id="r")
+
+    rows = asyncio.run(rs.run_all(turns, handle, lambda: None, save=lambda r: saved.append(len(r)), timeout=0.2))
+    assert saved == [1, 2, 3]  # written after every turn, not once at the end
+    assert [r["status"] for r in rows] == ["failed", "failed", "completed"]
+    assert rows[0]["error"] == "timeout" and "boom" in rows[1]["error"]

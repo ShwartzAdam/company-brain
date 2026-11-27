@@ -3,6 +3,7 @@ caller_id is injected here from the application's argument, whatever the model w
 import asyncio
 import contextlib
 import json
+from datetime import timedelta
 
 from langfuse import get_client
 from mcp import ClientSession
@@ -55,13 +56,15 @@ class Toolbox:
             # the server reads these and opens server.<tool> under THIS span, in the same trace
             meta |= {"trace_id": lf.get_current_trace_id(), "parent_span_id": lf.get_current_observation_id()}
             try:
-                res = await asyncio.wait_for(self.s.call_tool(name, args, meta={k: v for k, v in meta.items() if v}),
-                                             config.TOOL_TIMEOUT_S)  # a hung tool ends this call, not the run
+                res = await asyncio.wait_for(  # the session's own read timeout is the second line of defence
+                    self.s.call_tool(name, args, meta={k: v for k, v in meta.items() if v},
+                                     read_timeout_seconds=timedelta(seconds=config.TOOL_TIMEOUT_S + 5)),
+                    config.TOOL_TIMEOUT_S)
                 if res.isError:
                     raise RuntimeError(" ".join(getattr(c, "text", "") for c in res.content)[:300])
             except asyncio.TimeoutError:
-                sp.update(level="ERROR", status_message=f"tool {name} timed out after {config.TOOL_TIMEOUT_S}s")
-                raise TimeoutError(f"tool {name} timed out after {config.TOOL_TIMEOUT_S}s") from None
+                sp.update(level="ERROR", status_message=f"tool {name} timed out after {config.TOOL_TIMEOUT_S:g}s")
+                raise TimeoutError(f"tool {name} timed out after {config.TOOL_TIMEOUT_S:g}s") from None
             except Exception as e:
                 sp.update(level="ERROR", status_message=str(e)[:300])
                 raise

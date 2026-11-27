@@ -61,12 +61,11 @@ def fill(md: str, ids: dict) -> str:
     return re.sub(r"^\| `([A-Z]-[IS]-\d\d)` \| (—|\d+) \|[ ]*\|$", row, md, flags=re.M)
 
 
-async def run_all(turns, handle, reset, prefix="", environment=None, ck=None, save=None, turn_timeout=None):
-    """Sequential, in order. -> rows [{item, turn, thread, trace_id, status, request_id}].
-    One broken or stuck turn becomes a `failed` row and the run goes on; `save(rows)` runs after EVERY turn, so a crash
-    keeps what finished."""
+async def run_all(turns, handle, reset, prefix="", environment=None, ck=None, save=None, timeout=None):
+    """Sequential, in order. -> rows [{item, turn, thread, trace_id, status, request_id}]. A turn that raises or exceeds
+    `timeout` becomes a `failed` row and the run goes on; `save(rows)` runs after EVERY turn so a crash keeps what finished."""
     from brain import config
-    limit = turn_timeout or config.TURN_TIMEOUT_S + 30   # the agent's own limit fires first; this is the backstop
+    timeout = timeout or config.RUN_TURN_TIMEOUT_S
     rows, last = [], None
     for t in turns:
         if t["item"] != last:  # a new item: independent database and conversation
@@ -74,20 +73,20 @@ async def run_all(turns, handle, reset, prefix="", environment=None, ck=None, sa
             if ck:
                 Path(ck).unlink(missing_ok=True)
             last = t["item"]
-        row = {"item": t["item"], "turn": t["turn"], "thread": prefix + t["thread"], "trace_id": "", "status": "failed",
-               "request_id": "", "intent": "other"}
         try:
-            r = await asyncio.wait_for(handle(t["caller"], t["group"], prefix + t["thread"], t["message"], AS_OF,
-                                              case_id=t["item"], turn=t["turn"] if t["turn"] is not None else 1,
-                                              environment=environment), limit)
-            row |= {"trace_id": r.trace_id, "status": r.status, "request_id": r.request_id, "intent": r.intent}
-        except Exception as e:  # noqa: BLE001  includes the backstop timeout
-            row["error"] = f"{type(e).__name__}: {e}"[:300]
+            r = await asyncio.wait_for(handle(t["caller"], t["group"], prefix + t["thread"], t["message"], AS_OF, case_id=t["item"],
+                                              turn=t["turn"] if t["turn"] is not None else 1, environment=environment), timeout)
+            row = {"item": t["item"], "turn": t["turn"], "thread": prefix + t["thread"], "trace_id": r.trace_id,
+                   "status": r.status, "request_id": r.request_id, "intent": r.intent}
+        except Exception as e:  # noqa: BLE001  (includes the timeout)
+            why = "timeout" if isinstance(e, asyncio.TimeoutError) else f"{type(e).__name__}: {e}"[:200]
+            row = {"item": t["item"], "turn": t["turn"], "thread": prefix + t["thread"], "trace_id": "", "status": "failed",
+                   "request_id": "", "intent": "", "error": why}
         rows.append(row)
-        print(f"{t['item']} t{t['turn'] or '-'} {row['status']:11} {row['intent']:18} trace={row['trace_id'][:8] or '(none)'}"
-              + (f"  ERROR {row['error']}" if row.get("error") else ""))
         if save:
             save(rows)
+        print(f"{t['item']} t{t['turn'] or '-'} {row['status']:11} {row['intent']:18} trace={row['trace_id'][:8] or '(none)'}"
+              + (f" ERROR {row['error']}" if row.get("error") else ""))
     return rows
 
 
@@ -162,6 +161,10 @@ def verify(rows) -> list[str]:
     load_dotenv(ROOT / ".env")
     lf, bad = get_client(), []
     for r in rows:
+        if not r["trace_id"]:  # a failed turn with no trace: report it, do not look it up
+            print(f"{r['item']} t{r['turn'] or '-'} NO TRACE ({r.get('error', '')})")
+            bad.append(f"{r['item']} t{r['turn']}: no trace ({r.get('error', 'failed')})")
+            continue
         _, v, why = st.fetch(lf, r["trace_id"])
         print(f"{r['item']} t{r['turn'] or '-'} {v} {'; '.join(why)[:120]}")
         if v != "PASS":
@@ -189,12 +192,10 @@ def main():
     env = "submission" if a.submit else "rehearsal"
     out = ROOT / "evals" / "results" / f"submission-{'dry' if a.dry_run else env}{'-partial' if a.items else ''}.json"
     out.parent.mkdir(exist_ok=True)
-
-    def save(rows):  # after every turn: a crash or a Ctrl-C keeps everything that finished
-        out.write_text(json.dumps(rows, indent=1))
+    save = lambda rows: out.write_text(json.dumps(rows, indent=1))  # noqa: E731  after every turn
     rows = dry_run(turns, save) if a.dry_run else live(turns, env, "" if a.submit else "rehearsal-", save)
-    ids = {(r["item"], r["turn"]): r["trace_id"] for r in rows}
     save(rows)
+    ids = {(r["item"], r["turn"]): r["trace_id"] for r in rows}
     if a.dry_run:
         print(f"dry run ok: {len(rows)} turns, {len({r['thread'] for r in rows})} threads -> {out.name}")
         return

@@ -15,7 +15,6 @@ class BedrockBackend:
     def __init__(self):
         import boto3
         from botocore.config import Config
-        # explicit limits: a silent default let a replay hang for hours
         cfg = Config(connect_timeout=config.BEDROCK_CONNECT_TIMEOUT_S, read_timeout=config.BEDROCK_READ_TIMEOUT_S,
                      retries={"max_attempts": config.BEDROCK_MAX_ATTEMPTS, "mode": "standard"})
         self._c = boto3.client("bedrock-runtime", region_name=config.REGION, config=cfg)
