@@ -62,7 +62,7 @@ See also `PLAN-VALIDATION.md` and `KNOWN-TRAPS.md`.
 
 ## Step 3: Maya (HR and onboarding)
 
-Built and verified **offline** (66 pytest tests, scripted fake model, no AWS). The full live evaluation (`evals/session_replay.py`, `evals/maya_checks.py`) has not been run on this code yet; the numbers in `evals/results/` are from earlier code.
+Built and verified **offline** (112 pytest tests, scripted fake model, no AWS). The full live evaluation (`evals/session_replay.py`, `evals/maya_checks.py`) has not been run on this code yet; the numbers in `evals/results/` are from earlier code.
 
 - **Memory** is written by code, never by the model: facts come from the user's words (classify) and from tool rows (`db:<table>/<id>` sources, plus the top three document passages). The assistant's own sentences are never stored as facts. We chose this over the lesson's LLM distiller because the lesson's own results show distillation lowering task success; add a distiller only if context grows too large.
 - **Closed topics:** when the user drops a topic the plan sets `closes_topic`; code removes that topic's rows and raw turns and keeps one `decision: closed - ...` line, so "who was in my first question?" still works. A later turn on the same intent reopens it.
