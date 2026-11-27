@@ -1,0 +1,129 @@
+{
+ "W-I-01": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "c3ce023b250c09fa3d5d1d5df07a8d48"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:employees/E010",
+    "db:tickets/T001"
+   ],
+   "status": "completed",
+   "tools": [
+    "get_employee",
+    "list_employee_tickets"
+   ]
+  }
+ },
+ "W-I-02": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "d7caccef26dca1eae5cbc6c39e305358"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:access_requests/AR001",
+    "db:employees/E001",
+    "db:employees/E003",
+    "db:employees/E010",
+    "db:onboarding_tasks/OT005",
+    "db:software_subscriptions/SUB001"
+   ],
+   "status": "completed",
+   "tools": [
+    "list_direct_reports",
+    "seat_assignment_status"
+   ]
+  }
+ },
+ "W-I-03": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "judge_overstates": 0.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "d6d280a2589dfc72e77a8a16b6076a11"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "judge_overstates": 0.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:access_requests/AR001",
+    "db:approvals/AP001",
+    "db:approvals/AP002",
+    "db:employees/E010",
+    "db:software_subscriptions/SUB001",
+    "db:tickets/T001",
+    "documents/it_kb/webex_license_assignment.md",
+    "documents/it_kb/webex_login_issue.md"
+   ],
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "check_software_subscription",
+    "search_documents"
+   ]
+  }
+ }
+}
