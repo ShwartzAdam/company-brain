@@ -86,7 +86,8 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
                            extra={"tool_calls": [t for t in out["tool_log"] if not t.get("rejected")],
                                   "evidence": out["evidence"], "handoff": out.get("handoff"), "checklist": out.get("checklist"),
                                   "handoff_calls": out.get("handoff_calls") or 0, "decision": out.get("decision"),
-                                  "paused": bool(out.get("__interrupt__")), "pending": out.get("pending")},
+                                  "paused": bool(out.get("__interrupt__")), "pending": out.get("pending"),
+                                  "fallbacks": out.get("fallbacks") or []},
                            trace_id=trace_id)
             lf.update_current_span(
                 output=r.answer, level="ERROR" if r.status == "failed" else None,

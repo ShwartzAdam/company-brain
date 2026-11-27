@@ -89,7 +89,8 @@ def test_invisible_tool_is_rejected_and_never_called(scripted, hits, tmp_path):
              '{"done":true}', "I could not file anything.")
     r = turn("E010", "file a webex request", "t-d", tmp_path)
     # the action schema only lists visible tools, so the hidden write is refused before the executor sees it
-    assert counts() == before and r.tool_sequence == [] and "create_access_request" not in r.visible_tools
+    # (the model never searched, so code ran the one document search a policy question needs: a read, never a write)
+    assert counts() == before and r.tool_sequence == ["search_documents"] and "create_access_request" not in r.visible_tools
     assert not set(r.visible_tools) & WRITE_TOOLS
 
 
@@ -373,4 +374,63 @@ def test_evidence_shrink_keeps_every_source_whole():
     rows = [{"source": f"documents/handbook/getting-started-{i}.md", "text": "word " * 400} for i in range(8)]
     out = graph._evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
     assert all(r["source"] in out for r in rows)  # the old [:1500] cut a source in half
-    assert len(out) < 4000
+    assert len(out) < graph.EVIDENCE_CHARS + 600
+
+
+# ---- #19: nothing is cut silently; code enforces the lookups classify asked for ----
+def test_eight_whole_documents_reach_the_model_with_their_rule_text():
+    from brain import graph
+    rows = [{"source": f"documents/policies/p{i}.md", "text": f"RULE-{i} " + "word " * 250} for i in range(8)]  # about 1300 chars each
+    text, cut = graph._evidence([{"tool": "search_documents", "args": {}, "result": rows}])
+    assert cut == 0 and "truncated" not in text
+    assert all(f"RULE-{i}" in text and r["source"] in text for i, r in enumerate(rows))
+    assert text.count("word") >= 8 * 250  # the old cap kept 120 characters of each
+
+
+def test_a_too_big_result_is_cut_visibly_and_every_source_survives():
+    from brain import graph
+    rows = [{"source": f"documents/policies/p{i}.md", "text": "word " * 2000} for i in range(8)]
+    text, cut = graph._evidence([{"tool": "search_documents", "args": {}, "result": rows}])
+    assert cut > 0 and text.count("[truncated") == 8 and all(r["source"] in text for r in rows)
+    assert len(text) < graph.EVIDENCE_CHARS + 1500
+
+
+def test_evidence_budget_is_shared_so_a_big_result_does_not_starve_a_small_one():
+    from brain import graph
+    big = [{"source": "documents/a.md", "text": "word " * 5000}]
+    small = [{"source": "db:employees/E010", "full_name": "Rachel Stein"}]
+    text, _ = graph._evidence([{"tool": "search_documents", "args": {}, "result": big},
+                               {"tool": "get_employee", "args": {}, "result": small}])
+    assert "Rachel Stein" in text and "db:employees/E010" in text
+
+
+def test_policy_question_without_a_search_gets_one_from_code(scripted, hits, tmp_path):
+    scripted(plan("policy_question"), '{"done":true}', "Five days [policies/byod_policy.md].")
+    r = turn("E010", "What is the personal laptop policy?", "t-fs", tmp_path)
+    assert r.tool_sequence == ["search_documents"] and r.sources == ["policies/byod_policy.md"]
+    assert "forced_document_search" in r.extra["fallbacks"]  # said out loud, not silent
+
+
+def test_first_question_cannot_skip_lookups(scripted, hits, tmp_path):
+    scripted(plan("policy_question", tools=False), '{"done":true}', "Five days.")
+    r = turn("E010", "What is the personal laptop policy?", "t-ft", tmp_path)
+    assert r.tool_sequence == ["search_documents"]  # requires_tools False on a first turn is overridden by code
+    assert "requires_tools_forced_first_turn" in r.extra["fallbacks"]
+
+
+def test_one_failed_tool_keeps_the_evidence_and_the_turn_is_not_failed(scripted, hits, monkeypatch, tmp_path):
+    from brain import retrieval
+    calls = {"n": 0}
+
+    def flaky(query, caller_id, k=5, corpus=None, **kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("search backend down")
+        return [{"source": "policies/byod_policy.md", "text": "Personal laptops: five days.", "section": "s",
+                 "audience": "all", "score": 1.0}]
+    monkeypatch.setattr(retrieval, "search", flaky)
+    scripted(plan("policy_question"), '{"tool":"search_documents","args":{"query":"x"}}',
+             '{"tool":"search_documents","args":{"query":"y"}}', '{"done":true}', "Five days [policies/byod_policy.md].")
+    r = turn("E010", "What is the personal laptop policy?", "t-fx", tmp_path)
+    assert r.status == "completed" and r.sources == ["policies/byod_policy.md"]
+    assert any("ERROR" in json.dumps(e["result"]) for e in r.extra["evidence"])  # the failure is in the evidence, not hidden
