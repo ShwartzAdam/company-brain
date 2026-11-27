@@ -91,11 +91,17 @@ def record_consent(path, message_id: str, caller_id: str, employee_id: str, syst
         c.close()
 
 
-def check_consent(c, consent_id: str, caller_id: str, employee_id: str, system: str) -> None:
-    """Fail closed: a recorded consent bound to this caller, employee and system, or PermissionError."""
-    r = c.execute("SELECT caller_id, employee_id, system FROM consents WHERE message_id = ?", (consent_id,)).fetchone()
-    if r is None or tuple(r) != (caller_id, employee_id, system.lower()):
+def check_consent(c, consent_id: str, caller_id: str, employee_id: str, system: str, draft: str | None = None) -> None:
+    """Fail closed: a recorded, UNCONSUMED consent bound to this caller, employee and system (and, when the write carries
+    the draft, to that exact draft), or PermissionError. release_access consumes it, so it cannot be used again."""
+    r = c.execute("SELECT caller_id, employee_id, system, draft_hash, consumed FROM consents WHERE message_id = ?",
+                  (consent_id,)).fetchone()
+    if r is None or (r[0], r[1], r[2]) != (caller_id, employee_id, system.lower()):
         raise PermissionError("no recorded consent for this caller, employee and system")
+    if r[4]:
+        raise PermissionError("this consent was already used: a new go-ahead is needed")
+    if draft is not None and hashlib.sha256(draft.encode()).hexdigest() != r[3]:
+        raise PermissionError("this consent was given for a different draft")
 
 
 def approvals_recorded(c, request_id: str) -> tuple[bool, list]:

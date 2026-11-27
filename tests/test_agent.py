@@ -89,7 +89,8 @@ def test_invisible_tool_is_rejected_and_never_called(scripted, hits, tmp_path):
              '{"done":true}', "I could not file anything.")
     r = turn("E010", "file a webex request", "t-d", tmp_path)
     # the action schema only lists visible tools, so the hidden write is refused before the executor sees it
-    assert counts() == before and r.tool_sequence == [] and "create_access_request" not in r.visible_tools
+    # (the model never searched, so code ran the one document search a policy question needs: a read, never a write)
+    assert counts() == before and r.tool_sequence == ["search_documents"] and "create_access_request" not in r.visible_tools
     assert not set(r.visible_tools) & WRITE_TOOLS
 
 
@@ -289,7 +290,8 @@ def _maya_then_ask(scripted, tmp_path, ask, thread, **plan_kw):
     from brain.handoff import PendingWebexPort
     scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya Cohen"}}', '{"done":true}', "Maya is E001.")
     turn("E004", "Pull up Maya Cohen's record.", thread, tmp_path, "UG_HR")
-    scripted(plan("access_request", False, subject_name="Maya Cohen", system_name="Webex", **plan_kw), "It is done.")
+    plan_kw.setdefault("subject_name", "Maya Cohen")
+    scripted(plan("access_request", False, system_name="Webex", **plan_kw), "It is done.")
     port = PendingWebexPort()
 
     async def go():
@@ -373,20 +375,137 @@ def test_evidence_shrink_keeps_every_source_whole():
     rows = [{"source": f"documents/handbook/getting-started-{i}.md", "text": "word " * 400} for i in range(8)]
     out = graph._evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
     assert all(r["source"] in out for r in rows)  # the old [:1500] cut a source in half
-    assert len(out) < 4000
+    assert len(out) < graph.EVIDENCE_CHARS + 600
+
+
+# ---- #19: nothing is cut silently; code enforces the lookups classify asked for ----
+def test_eight_whole_documents_reach_the_model_with_their_rule_text():
+    from brain import graph
+    rows = [{"source": f"documents/policies/p{i}.md", "text": f"RULE-{i} " + "word " * 250} for i in range(8)]  # about 1300 chars each
+    text, cut = graph._evidence([{"tool": "search_documents", "args": {}, "result": rows}])
+    assert cut == 0 and "truncated" not in text
+    assert all(f"RULE-{i}" in text and r["source"] in text for i, r in enumerate(rows))
+    assert text.count("word") >= 8 * 250  # the old cap kept 120 characters of each
+
+
+def test_a_too_big_result_is_cut_visibly_and_every_source_survives():
+    from brain import graph
+    rows = [{"source": f"documents/policies/p{i}.md", "text": "word " * 2000} for i in range(8)]
+    text, cut = graph._evidence([{"tool": "search_documents", "args": {}, "result": rows}])
+    assert cut > 0 and text.count("[truncated") == 8 and all(r["source"] in text for r in rows)
+    assert len(text) < graph.EVIDENCE_CHARS + 1500
+
+
+def test_evidence_budget_is_shared_so_a_big_result_does_not_starve_a_small_one():
+    from brain import graph
+    big = [{"source": "documents/a.md", "text": "word " * 5000}]
+    small = [{"source": "db:employees/E010", "full_name": "Rachel Stein"}]
+    text, _ = graph._evidence([{"tool": "search_documents", "args": {}, "result": big},
+                               {"tool": "get_employee", "args": {}, "result": small}])
+    assert "Rachel Stein" in text and "db:employees/E010" in text
+
+
+def test_policy_question_without_a_search_gets_one_from_code(scripted, hits, tmp_path):
+    scripted(plan("policy_question"), '{"done":true}', "Five days [policies/byod_policy.md].")
+    r = turn("E010", "What is the personal laptop policy?", "t-fs", tmp_path)
+    assert r.tool_sequence == ["search_documents"] and r.sources == ["policies/byod_policy.md"]
+    assert "forced_document_search" in r.extra["fallbacks"]  # said out loud, not silent
+
+
+def test_first_question_cannot_skip_lookups(scripted, hits, tmp_path):
+    scripted(plan("policy_question", tools=False), '{"done":true}', "Five days.")
+    r = turn("E010", "What is the personal laptop policy?", "t-ft", tmp_path)
+    assert r.tool_sequence == ["search_documents"]  # requires_tools False on a first turn is overridden by code
+    assert "requires_tools_forced_first_turn" in r.extra["fallbacks"]
+
+
+def test_one_failed_tool_keeps_the_evidence_and_the_turn_is_not_failed(scripted, hits, monkeypatch, tmp_path):
+    from brain import retrieval
+    calls = {"n": 0}
+
+    def flaky(query, caller_id, k=5, corpus=None, **kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("search backend down")
+        return [{"source": "policies/byod_policy.md", "text": "Personal laptops: five days.", "section": "s",
+                 "audience": "all", "score": 1.0}]
+    monkeypatch.setattr(retrieval, "search", flaky)
+    scripted(plan("policy_question"), '{"tool":"search_documents","args":{"query":"x"}}',
+             '{"tool":"search_documents","args":{"query":"y"}}', '{"done":true}', "Five days [policies/byod_policy.md].")
+    r = turn("E010", "What is the personal laptop policy?", "t-fx", tmp_path)
+    assert r.status == "completed" and r.sources == ["policies/byod_policy.md"]
+    assert any("ERROR" in json.dumps(e["result"]) for e in r.extra["evidence"])  # the failure is in the evidence, not hidden
+
+
+# ---- #20: who a handoff is for, and constraints that must never be dropped ----
+def test_lowercase_subject_name_still_targets_that_person_not_the_caller(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "Go ahead and file the Webex access request for her now.", "t-l1",
+                                subject_name="maya cohen")
+    assert r.extra["handoff"]["subject_employee_id"] == "E001" and len(port.calls) == 1  # E001, not the caller E004
+
+
+def test_i_need_it_and_go_ahead_in_one_message_files_for_the_caller(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "I need Webex access too, go ahead and file it.", "t-l2", subject_name="")
+    assert r.extra["handoff"]["subject_employee_id"] == "E004" and len(port.calls) == 1
+
+
+def test_a_bare_go_ahead_names_nobody_so_nothing_is_filed(scripted, tmp_path):
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "Go ahead and file the Webex request.", "t-l3", subject_name="")
+    assert r.extra["handoff"] is None and not port.calls
+
+
+def test_constraints_are_never_dropped_but_facts_are_capped():
+    from brain import graph
+    rules = ["do not file until I say so"] + [f"rule {i}" for i in range(100)]
+    assert "do not file until I say so" in graph._union([], rules, cap=None)
+    assert len(graph._union([], [f"f{i}" for i in range(100)])) == graph.MAX_FACTS
+
+
+def test_checklist_never_mixes_two_employees():
+    from brain import checklist
+    row = lambda who, tid: {"source": f"db:onboarding_tasks/{tid}", "task_id": tid, "employee_id": who, "status": "planned",  # noqa: E731
+                            "description": "Laptop"}
+    ev = [{"tool": "list_onboarding_tasks", "args": {"employee_id": "E001"}, "result": [row("E001", "OT001")]},
+          {"tool": "list_onboarding_tasks", "args": {"employee_id": "E020"}, "result": [row("E020", "OT900")]}]
+    cl = checklist.build(ev)
+    assert cl.employee_id == "E001" and [i.task_id for i in cl.items] == ["OT001"]
+
+
+def test_a_lowercase_name_in_a_self_style_request_is_not_the_caller(scripted, tmp_path):
+    # "I need ... for maya cohen" used to read as the caller asking for themselves (lowercase = "not a name"): E004 got the request
+    port, r, _ = _maya_then_ask(scripted, tmp_path, "I need Webex access set up for maya cohen.", "t-l4", subject_name="maya cohen")
+    assert r.extra["handoff"] is None and not port.calls  # someone else's request needs an explicit go-ahead
+
+
 
 
 # ---- #18: bounded calls, a turn never raises ----
-def test_hung_tool_call_times_out_and_the_turn_is_failed(scripted, tmp_path, monkeypatch):
+def test_hung_tool_calls_time_out_and_a_second_one_fails_the_turn(scripted, tmp_path, monkeypatch):
     from brain import config
     monkeypatch.setattr(config, "TOOL_TIMEOUT_S", 0.2)
 
     async def hang(*a, **kw):
         await asyncio.sleep(30)
     monkeypatch.setattr("mcp.client.session.ClientSession.call_tool", hang)
-    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}', "x")
-    r = turn("E010", "my tickets", "t-hang", tmp_path)
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}',
+             '{"tool":"list_employee_tickets","args":{"employee_id":"E009"}}', '{"done":true}', "x")
+    r = turn("E010", "my tickets", "t-hang", tmp_path)  # two timeouts in one turn: give up (#19: one failure alone does not)
     assert r.status == "failed" and "timed out" in r.error and status.answer_agrees(r.status, r.answer)
+
+
+def test_one_hung_tool_call_is_reported_in_the_answer_not_hidden(scripted, tmp_path, monkeypatch):
+    from brain import config
+    monkeypatch.setattr(config, "TOOL_TIMEOUT_S", 0.2)
+
+    async def hang(*a, **kw):
+        await asyncio.sleep(30)
+    monkeypatch.setattr("mcp.client.session.ClientSession.call_tool", hang)
+    scripted(plan("ticket_status"), '{"tool":"list_employee_tickets","args":{"employee_id":"E010"}}', '{"done":true}',
+             '{"done":true}',  # the failed call counts as no lookup, so gather is re-armed once and the model stops again
+             "I could not look up the tickets: the tool timed out.")
+    r = turn("E010", "my tickets", "t-hang1", tmp_path)
+    assert r.status == "completed" and "tool_failed:list_employee_tickets" in r.extra["fallbacks"]
+    assert any("timed out" in json.dumps(e["result"]) for e in r.extra["evidence"])
 
 
 def test_hung_graph_is_failed_by_the_turn_timeout(scripted, tmp_path, monkeypatch):

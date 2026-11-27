@@ -91,7 +91,9 @@ async def run_all(turns, handle, reset, prefix="", environment=None, ck=None, sa
 
 
 class DryBackend:
-    """Answers every call shape with something valid, so the plumbing runs with no AWS."""
+    """Answers every call shape with something valid, so the plumbing runs with no AWS. The dry run proves threads, groups,
+    ids and the table fill; it does NOT exercise real evidence gathering, the handoff or the pause (classify says
+    `other` with no tools), so a green dry run says nothing about answer quality."""
     def complete(self, messages, system, max_tokens, temperature):
         if "classify the newest message" in system.lower():
             return json.dumps({"intent": "other", "requires_tools": False})

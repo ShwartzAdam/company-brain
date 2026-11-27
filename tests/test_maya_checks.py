@@ -87,3 +87,9 @@ def test_args_check_catches_wrong_employee_and_ignores_uncalled_tools():
     ok = [{"tool": "list_onboarding_tasks", "args": {"employee_id": "E001"}},
           {"tool": "get_employee", "args": {"query": "Maya Cohen"}}]
     assert sr.check_args(t, ok) == [] and sr.check_args(t, []) == []
+
+
+def test_handoff_check_catches_a_missing_or_wrong_caller():
+    for bad in (dict(caller_id=None), dict(caller_id="E010")):
+        out = mc.check_handoff([rec(S2, 10, extra=good_handoff(**bad))], rec(S2, 13, extra={"handoff_calls": 1}))
+        assert any("caller" in f for f in out), bad

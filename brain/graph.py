@@ -18,6 +18,7 @@ from brain.webex import AccessDecision, release_pending
 
 MAX_STEPS = 6
 MAX_FACTS = 60
+_GENERIC_SUBJECT = re.compile(r"\b(user|caller|requester|requestor|myself|me|i|employee|hire|joiner|person|someone)\b", re.I)
 
 
 class State(TypedDict, total=False):
@@ -47,8 +48,9 @@ class State(TypedDict, total=False):
     fallbacks: list       # silent degradations that fired this turn (classify default plan, gather gave up)
 
 
-def _union(old, new):
-    return list(dict.fromkeys([*(old or []), *(new or [])]))[-MAX_FACTS:]  # ponytail: facts/constraints only grow
+def _union(old, new, cap: int | None = MAX_FACTS):
+    out = list(dict.fromkeys([*(old or []), *(new or [])]))
+    return out[-cap:] if cap else out  # facts keep the newest `cap`; constraints use cap=None: a user's rule is never dropped
 
 
 def _window(state):
@@ -78,6 +80,10 @@ async def classify(state: State, config) -> dict:
         plan = TurnPlan()
         fallbacks.append("classify_default_plan")
         get_client().update_current_span(level="WARNING", status_message=f"classify fell back to the default plan: {e}"[:300])
+    if (not plan.requires_tools and not plan.refuse and plan.intent != "ambiguous"
+            and not state.get("messages") and not state.get("facts")):
+        plan.requires_tools = True  # the prompt says a first question needs a lookup; code enforces it: nothing to answer from
+        fallbacks.append("requires_tools_forced_first_turn")
     _io({"message": state["message"][:300], "constraints": state.get("constraints")},
         {"intent": plan.intent, "requires_tools": plan.requires_tools, "lookups_needed": plan.lookups_needed,
          "system": plan.system_name, "subject": plan.subject_name, "closes_topic": plan.closes_topic, "refuse": plan.refuse},
@@ -93,7 +99,7 @@ async def classify(state: State, config) -> dict:
             closed.append(prev)
         facts.append(f"decision: closed - {plan.closes_topic}")
     return {"plan": plan.model_dump(), "closed": closed, "handoff": None, "decision": None, "pause_now": False, "checklist": None, "facts": _union(facts, plan.relevant_facts),
-            "constraints": _union(state.get("constraints"), plan.relevant_constraints),
+            "constraints": _union(state.get("constraints"), plan.relevant_constraints, cap=None),
             "evidence": [], "tool_log": [], "sources": [], "rearmed": False, "error": "", "answer": "", "scope": "none", "visible": [],
             "fallbacks": fallbacks}
 
@@ -116,19 +122,46 @@ GATHER_SYSTEM = (
     "stop with done as soon as the question can be answered. Never call anything to file or approve.")
 
 
-def _shrink(result, limit: int = 1500):
-    """Cap a tool result near `limit` characters by shortening each row's `text`, never by cutting the JSON string:
-    a cut string once ended mid-`source` and the model cited '[documents/handbook/getting-.]'."""
+EVIDENCE_CHARS = 12000  # the whole evidence block. 8 whole-document results are about 1400 characters each
+MIN_ITEM_CHARS = 1500   # no single result is squeezed below this, however many there are
+_DOC_WORDS = re.compile(r"polic|rule|threshold|handbook|document|memo|article|eligib|guideline|procedure|contract term", re.I)
+
+
+def _shrink(result, limit: int = EVIDENCE_CHARS):
+    """-> (result, chars_cut). Cap a tool result near `limit` characters by shortening each row's `text`, never by
+    cutting the JSON string (a cut string once ended mid-`source` and the model cited '[documents/handbook/getting-.]').
+    A shortened row ends with a marker, so the model knows the text is partial."""
+    if isinstance(result, str):
+        return (result, 0) if len(result) <= limit else (result[:limit] + " ...[truncated]", len(result) - limit)
     if not isinstance(result, list) or len(json.dumps(result)) <= limit:
-        return result
-    cap = max(120, limit // max(1, len(result)) - 120)
-    return [{**r, "text": r["text"][:cap] + "..."} if isinstance(r, dict) and isinstance(r.get("text"), str) and len(r["text"]) > cap else r
-            for r in result]
+        return result, 0
+    rows = [r for r in result if isinstance(r, dict) and isinstance(r.get("text"), str)]
+    if not rows:
+        return result, 0
+    room = limit - (len(json.dumps(result)) - sum(len(r["text"]) for r in rows))
+    cap = max(120, room // len(rows))
+    cut, out = 0, []
+    for r in result:
+        if isinstance(r, dict) and isinstance(r.get("text"), str) and len(r["text"]) > cap:
+            cut += len(r["text"]) - cap
+            r = {**r, "text": r["text"][:cap] + f" ...[truncated, {len(r['text']) - cap} more characters]"}
+        out.append(r)
+    return out, cut
+
+
+def _evidence(ev: list) -> tuple[str, int]:
+    """-> (prompt text, characters cut). One budget for the whole block, shared between the results."""
+    each = max(MIN_ITEM_CHARS, EVIDENCE_CHARS // max(1, len(ev)))
+    lines, cut = [], 0
+    for i, e in enumerate(ev, 1):
+        res, c = _shrink(e["result"], each)
+        cut += c
+        lines.append(f"[{i}] {e['tool']}({json.dumps(e['args'])}) -> {json.dumps(res)}")
+    return "\n".join(lines) or "(none yet)", cut
 
 
 def _evidence_text(ev: list) -> str:
-    return "\n".join(f"[{i}] {e['tool']}({json.dumps(e['args'])}) -> {json.dumps(_shrink(e['result']))[:3000]}"
-                     for i, e in enumerate(ev, 1)) or "(none yet)"
+    return _evidence(ev)[0]
 
 
 def _sources(result) -> list[str]:
@@ -144,7 +177,7 @@ async def gather(state: State, config) -> dict:
     box = config["configurable"]["toolbox"]
     visible, ev, log, srcs = state["visible"], list(state["evidence"]), list(state["tool_log"]), list(state["sources"])
     error = ""
-    bad = 0
+    bad = failures = 0
     fallbacks = list(state.get("fallbacks") or [])
     needed, nudged = TurnPlan(**state["plan"]).lookups_needed, False
     for _ in range(MAX_STEPS):
@@ -165,7 +198,7 @@ async def gather(state: State, config) -> dict:
                 break
             continue
         if act.get("done") or not act.get("tool"):
-            made = sum(1 for t in log if not t.get("rejected"))
+            made = sum(1 for t in log if not t.get("rejected") and not t.get("failed"))
             if needed and made < min(len(needed), 3) and not nudged:  # one bounded refinement, never a search-until-found loop
                 nudged = True
                 ev.append({"tool": "(planner)", "args": {}, "result": f"NOT DONE: the question still needs {needed}"})
@@ -185,14 +218,35 @@ async def gather(state: State, config) -> dict:
             break
         try:
             res = await box.call(name, args)  # the tool.<name> span is opened inside Toolbox.call
-        except Exception as e:  # noqa: BLE001
-            error = f"{name} failed: {e}"
-            break
+        except Exception as e:  # noqa: BLE001  one failed tool must not throw away what was already gathered
+            failures += 1
+            fallbacks.append(f"tool_failed:{name}")
+            log.append({"tool": name, "args": args, "failed": True})
+            ev.append({"tool": name, "args": args, "result": f"ERROR: {name} failed ({str(e)[:200]}). Say this could not be looked up."})
+            if failures >= 2:  # a second failure: give up, the turn is failed
+                error = f"{name} failed: {e}"
+                break
+            continue
         found = _sources(res)
         log.append({"tool": name, "args": args})
         ev.append({"tool": name, "args": args, "result": res})
         srcs += found
     plan = TurnPlan(**state["plan"])
+    if (plan.requires_tools and "search_documents" in visible and not error
+            and not any(t["tool"] == "search_documents" and not t.get("rejected") and not t.get("failed") for t in log)
+            and (plan.intent == "policy_question" or any(_DOC_WORDS.search(x) for x in needed))):
+        # code enforces what classify asked for: a question that needs a document is not answered without a search
+        args = {"query": gate.top_level(state["message"]).strip()[:300]}
+        fallbacks.append("forced_document_search")
+        try:
+            res = await box.call("search_documents", args)
+            log.append({"tool": "search_documents", "args": args})
+            ev.append({"tool": "search_documents", "args": args, "result": res})
+            srcs += _sources(res)
+        except Exception as e:  # noqa: BLE001
+            fallbacks.append("tool_failed:search_documents")
+            log.append({"tool": "search_documents", "args": args, "failed": True})
+            ev.append({"tool": "search_documents", "args": args, "result": f"ERROR: search failed ({str(e)[:200]}). Say the document could not be searched."})
     if (plan.intent == "access_request" and plan.system_name.strip() and "search_documents" in visible and not error
             and not any("it_kb" in x for x in srcs)):  # #13: the login article is not reliably ranked; one targeted search
         args = {"query": f"{plan.system_name} license login account not licensed", "corpus": "it_kb"}
@@ -201,8 +255,9 @@ async def gather(state: State, config) -> dict:
             log.append({"tool": "search_documents", "args": args})
             ev.append({"tool": "search_documents", "args": args, "result": res})
             srcs += _sources(res)
-        except Exception as e:  # noqa: BLE001
-            error = f"search_documents failed: {e}"
+        except Exception as e:  # noqa: BLE001  a missing helper search must not fail the whole turn
+            fallbacks.append("tool_failed:search_documents(it_kb)")
+            log.append({"tool": "search_documents", "args": args, "failed": True})
     _io({"visible_tools": visible, "lookups_needed": needed},
         {"tool_sequence": [t["tool"] for t in log], "rejected": [t["tool"] for t in log if t.get("rejected")],
          "sources": sorted(set(srcs)), "error": error}, nudged=nudged)
@@ -213,7 +268,7 @@ async def gather(state: State, config) -> dict:
 
 def after_gather(state: State) -> str:
     plan = TurnPlan(**state["plan"])
-    used = any(not t.get("rejected") for t in state["tool_log"])
+    used = any(not t.get("rejected") and not t.get("failed") for t in state["tool_log"])
     if plan.requires_tools and not used and not state["rearmed"] and not state["error"]:
         return "rearm"
     return "handoff" if plan.intent == "access_request" and not state["error"] else "answer"
@@ -252,9 +307,10 @@ async def handoff(state: State, config) -> dict:
     # no "do not file" rule is in force (that escalates to humans and grants nothing). Both are regex heuristics.
     me = _employees(state).get(caller, "").lower()
     subj = plan.subject_name.strip()
-    # the planner's subject_name is free text ("user", "caller", "new hire in Customer Success"): it names ANOTHER
-    # person only if it reads like a name (capitalised) and is not the caller's own. A heuristic, tested.
-    about_me = not subj or subj.lower() in ("user", "me", "myself", "i", "caller", "requester", me, caller.lower()) or not subj[:1].isupper()
+    # the planner's subject_name is free text ("user", "caller", "new hire in Customer Success"). It names the caller
+    # (or nobody) when it is empty, one of those generic words, or the caller's own name or id. Anything else is a
+    # name: resolved case-insensitively against real employees, so "rachel stein" is Rachel, never the caller.
+    about_me = (not subj or bool(_GENERIC_SUBJECT.search(subj)) or subj.lower() in (me, caller.lower()))
     mine = (about_me and gate.self_request(state["message"]) and not gate.blocks_filing(state.get("constraints")))
     explicit = gate.consent_from_message(state["message"])
     if plan.intent == "access_request":  # why a write may or may not follow, visible without reading the regexes
@@ -268,13 +324,14 @@ async def handoff(state: State, config) -> dict:
         _io({"intent": plan.intent}, {"handoff": None}, reason="no consent for a handoff on this turn")
         return {"handoff": None}
     seen = _employees(state)
-    if not (mine and not gate.consent_from_message(state["message"])) and subj and not any(n.lower() == subj.lower() for n in seen.values()):
+    if not about_me and not any(n.lower() == subj.lower() for n in seen.values()):
         # the caller named someone no earlier lookup returned: code resolves them (exact full name), never the model
         for r in await cfg["toolbox"].call("get_employee", {"query": subj}):
             if isinstance(r, dict) and r.get("employee_id"):
                 seen[r["employee_id"]] = r["full_name"]
-    ids = [caller] if mine and not gate.consent_from_message(state["message"]) else [
-        i for i, n in seen.items() if plan.subject_name and n.lower() == plan.subject_name.lower()]
+    # about the caller only when they say so themselves ("I need Webex ... go ahead and file it"); a bare "go ahead" names nobody
+    ids = ([caller] if gate.self_request(state["message"]) else []) if about_me else [
+        i for i, n in seen.items() if n.lower() == subj.lower()]
     if len(ids) != 1 or not plan.system_name.strip():
         _io({"subject": plan.subject_name, "system": plan.system_name}, {"handoff": None},
             reason="subject did not resolve to exactly one employee or no system", matches=ids)
@@ -339,6 +396,7 @@ def _row_facts(evidence: list) -> list[str]:
 @_node("answer")
 async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
+    fallbacks = list(state.get("fallbacks") or [])
     status = final_status(error=bool(state["error"]), clarify=plan.intent == "ambiguous", refuse=plan.refuse,
                           action_unreleased=plan.intent == "access_request")
     if plan.intent == "ambiguous":
@@ -346,9 +404,13 @@ async def answer(state: State, config) -> dict:
     elif status == "failed":
         text = f"I could not complete this: {state['error']}."
     else:
+        ev_text, cut = _evidence(state["evidence"])
+        if cut:
+            fallbacks.append("evidence_truncated")
+            get_client().update_current_span(level="WARNING", status_message=f"evidence shortened by {cut} characters")
         body = (f"Facts: {state.get('facts')}\nConstraints: {state.get('constraints')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
-                f"Evidence:\n{_evidence_text(state['evidence'])}\n\nQuestion:\n{state['message']}")
+                f"Evidence:\n{ev_text}\n\nQuestion:\n{state['message']}")
         if state.get("handoff"):
             body += (f"\n\nA handoff to the Webex workflow was recorded as PENDING for {state['handoff']['subject_employee_id']} "
                      f"({state['handoff']['system']}). It is not filed, approved or granted.")
@@ -369,7 +431,7 @@ async def answer(state: State, config) -> dict:
     _io({"evidence_items": len(state["evidence"]), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(state["evidence"])
-    return {"answer": text, "status": status, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
+    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 

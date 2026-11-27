@@ -63,13 +63,13 @@ def test_filter_is_in_query_body(fake_llm):
     assert "filter" not in mgr
 
 
-def consent(caller, emp, system="Webex", mid="m1"):
-    tools.record_consent(caller, emp, system, mid, "draft", AS_OF, gate.consent_token(caller, emp, system, mid, "draft"))
+def consent(caller, emp, system="Webex", mid="m1", draft="draft"):
+    tools.record_consent(caller, emp, system, mid, draft, AS_OF, gate.consent_token(caller, emp, system, mid, draft))
     return mid
 
 
 def test_access_request_reuses_and_is_idempotent():
-    consent("E018", "E010")
+    consent("E018", "E010", draft="calls")
     a = tools.create_access_request("E018", "E010", "Webex", "calls", "c1", AS_OF, "m1")
     assert a["entity_id"] == "AR001" and a["reused"]
     b = tools.create_access_request("E018", "E010", "Webex", "calls", "c1", AS_OF, "m1")
@@ -80,7 +80,7 @@ def test_access_request_reuses_and_is_idempotent():
 
 
 def test_new_request_twice_one_row():
-    consent("E001", "E001", "Okta")
+    consent("E001", "E001", "Okta", draft="start")
     n = len(db.rows("SELECT 1 FROM access_requests"))
     tools.create_access_request("E001", "E001", "Okta", "start", "c1", AS_OF, "m1")
     tools.create_access_request("E001", "E001", "Okta", "start", "c1", AS_OF, "m1")
@@ -88,7 +88,8 @@ def test_new_request_twice_one_row():
 
 
 def test_ticket_reuses_t001():
-    r = tools.create_ticket("E010", "E010", "Access", "Webex license", "no license", "d", "Webex", "c1", AS_OF)
+    consent("E010", "E010", "Webex")
+    r = tools.create_ticket("E010", "E010", "Access", "Webex license", "no license", "d", "Webex", "c1", AS_OF, "m1")
     assert r["entity_id"] == "T001" and r["reused"]
 
 

@@ -47,8 +47,19 @@ def check_status_agrees(status: str, answer: str) -> list:
 
 
 def check_write_needs_consent(write_keys: list, consents: list) -> list:
-    """Every approval/request/release write key names a conversation message that has a consent row."""
-    return [f"write {k} has no consent" for k in write_keys if k.split(":")[0] in ("ar", "ap", "rel") and not consents]
+    """Every request/approval/release write key needs a consent row from the SAME conversation (message ids are
+    `<thread>:<n>`); a request write also needs it to be for the SAME employee. `consents` are dict rows
+    {message_id, employee_id}. A consent row from some other conversation or person no longer satisfies it."""
+    out = []
+    for k in write_keys:
+        kind, *rest = k.split(":")
+        if kind not in ("ar", "ap", "rel"):
+            continue
+        conv, subject = rest[-1], (rest[0] if kind == "ar" else None)
+        if not any(str(c.get("message_id", "")).startswith(f"{conv}:") and (subject is None or c.get("employee_id") == subject)
+                   for c in consents if isinstance(c, dict)):
+            out.append(f"write {k} has no consent row for this conversation" + (f" and employee {subject}" if subject else ""))
+    return out
 
 
 def check_nofile_carry(base: dict, after: dict, n: int, go_turn: int | None) -> list:
@@ -72,7 +83,12 @@ def _selftest():
     assert check_never_granted("Blocked at 42/40, nothing granted.", {"status": "pending"}, "blocked", {"AP1": "pending"}) == []
     assert check_never_granted("ok", None, "approved", {"AP1": "pending"})
     assert check_status_agrees("pending", "I've filed it.") and check_status_agrees("pending", "AR001 is pending.") == []
-    assert check_write_needs_consent(["ar:E010:S001:c"], []) and check_write_needs_consent(["ar:E010:S001:c"], ["m"]) == []
+    ok = {"message_id": "c:1", "employee_id": "E010"}
+    assert check_write_needs_consent(["ar:E010:S001:c"], []) and check_write_needs_consent(["ar:E010:S001:c"], [ok]) == []
+    assert check_write_needs_consent(["ar:E010:S001:c"], [{"message_id": "other:1", "employee_id": "E010"}])  # another conversation
+    assert check_write_needs_consent(["ar:E010:S001:c"], [{"message_id": "c:1", "employee_id": "E009"}])      # another employee
+    assert check_write_needs_consent(["ap:AP001:c", "rel:AR001:c"], [ok]) == [] and check_write_needs_consent(["ap:AP001:c"], [])
+    assert check_write_needs_consent(["consent:c:1"], []) == []  # the consent write itself needs none
     print("webex_checks selftest ok")
 
 

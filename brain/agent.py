@@ -80,7 +80,8 @@ async def ahandle_turn(caller_id: str, caller_group: str, thread_id: str, messag
                            extra={"tool_calls": [t for t in out["tool_log"] if not t.get("rejected")],
                                   "evidence": out["evidence"], "handoff": out.get("handoff"), "checklist": out.get("checklist"),
                                   "handoff_calls": out.get("handoff_calls") or 0, "decision": out.get("decision"),
-                                  "paused": bool(out.get("__interrupt__")), "pending": out.get("pending")},
+                                  "paused": bool(out.get("__interrupt__")), "pending": out.get("pending"),
+                                  "fallbacks": out.get("fallbacks") or []},
                            trace_id=trace_id)
             lf.update_current_span(
                 output=r.answer, level="ERROR" if r.status == "failed" else None,
@@ -126,7 +127,12 @@ async def aresume_pending(caller_id: str, caller_group: str, thread_id: str, as_
             cfg = {"configurable": {"thread_id": thread_id, "toolbox": box, "as_of": as_of, "request_id": rid}}
             with propagate_attributes(session_id=thread_id, user_id=caller_id, metadata=identity, environment=environment,
                                       tags=["novaops", "resume"]):
-                r = await _resume(box, g, cfg, st, pend, Command)
+                try:
+                    r = await asyncio.wait_for(_resume(box, g, cfg, st, pend, Command), config.TURN_TIMEOUT_S)
+                except Exception as e:  # noqa: BLE001  same rule as a turn: a broken resume is `failed`, never an escaping error
+                    why = (f"resume timed out after {config.TURN_TIMEOUT_S:g}s" if isinstance(e, asyncio.TimeoutError)
+                           else f"{type(e).__name__}: {e}")[:300]
+                    r = TurnResult(FAILED_ANSWER, "failed", "webex", [], [], [], "access_request", rid, why)
             r.trace_id = box.ctx["trace_id"]
             lf.update_current_span(output=r.answer, metadata={**identity, "status": r.status, "scope": "webex",
                                                               "paused": r.status == "pending", "pending": list(pend)})

@@ -145,7 +145,7 @@ def check_handoff(recs, replay) -> list:
         out.append(f"{S2} t10: system {h.get('system')!r}, expected Webex")
     out += [f"{S2} t10: handoff missing {k}" for k in ("justification", "conversation_id", "caller_id", "idempotency_key")
             if not h.get(k)]
-    if h.get("caller_id") not in (None, "E004"):
+    if h.get("caller_id") != "E004":
         out.append(f"{S2} t10: caller {h.get('caller_id')!r}, expected E004 (argument, not message text)")
     if (r10["extra"].get("handoff_calls") or 0) != 1:
         out.append(f"{S2} t10: port called {r10['extra'].get('handoff_calls')} times, expected 1")

@@ -187,7 +187,7 @@ def create_access_request(caller_id: str, employee_id: str, system: str, justifi
     sid = sysrow[0]["system_id"]
 
     def fn(c):
-        gate.check_consent(c, consent_id, caller_id, employee_id, sysrow[0]["system_name"])
+        gate.check_consent(c, consent_id, caller_id, employee_id, sysrow[0]["system_name"], draft=justification)
         ex = c.execute("SELECT request_id, status FROM access_requests WHERE employee_id = ? AND system_id = ? "
                        "AND status NOT IN ('rejected','denied','cancelled') ORDER BY request_id LIMIT 1",
                        (employee_id, sid)).fetchone()
@@ -203,13 +203,18 @@ def create_access_request(caller_id: str, employee_id: str, system: str, justifi
 
 
 def create_ticket(caller_id: str, employee_id: str, category: str, subcategory: str, subject: str,
-                  description: str, system: str, conversation_id: str, as_of: str) -> dict:
+                  description: str, system: str, conversation_id: str, as_of: str, consent_id: str) -> dict:
+    """A write like any other: needs the caller's recorded, unused consent for this employee and system. No loadout
+    shows it and no workflow calls it today; the gate is here so that wiring it up later cannot skip consent."""
     if not _allowed_actor(caller_id, employee_id):
         raise PermissionError(f"{caller_id} may not open a ticket for {employee_id}")
-    sysrow = db.rows("SELECT system_id FROM systems WHERE lower(system_name) LIKE lower(?) LIMIT 1", (f"%{system}%",))
+    sysrow = db.rows("SELECT system_id, system_name FROM systems WHERE lower(system_name) LIKE lower(?) LIMIT 1", (f"%{system}%",))
     sid = sysrow[0]["system_id"] if sysrow else None
 
     def fn(c):
+        if not sysrow:
+            raise PermissionError("no consent can exist for an unknown system")
+        gate.check_consent(c, consent_id, caller_id, employee_id, sysrow[0]["system_name"])
         ex = c.execute("SELECT ticket_id, status FROM tickets WHERE employee_id = ? AND related_system_id IS ? "
                        "AND category = ? AND status NOT IN ('closed','resolved') ORDER BY ticket_id LIMIT 1",
                        (employee_id, sid, category)).fetchone()

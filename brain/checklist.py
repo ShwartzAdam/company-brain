@@ -27,9 +27,12 @@ def _rows(evidence: list, tool: str):
 
 
 def build(evidence: list) -> OnboardingChecklist | None:
-    tasks = [(e["args"].get("employee_id", ""), r) for e, rows in _rows(evidence, "list_onboarding_tasks") for r in rows]
+    tasks = [(r.get("employee_id") or e["args"].get("employee_id", ""), r)
+             for e, rows in _rows(evidence, "list_onboarding_tasks") for r in rows]
     if not tasks:
         return None
+    owner = tasks[0][0]  # one checklist is one person's: two employees' tasks are never mixed into one
+    tasks = [(who, r) for who, r in tasks if who == owner]
     subs = [r for _, rows in _rows(evidence, "check_software_subscription") for r in rows]
     contracts = [r for _, rows in _rows(evidence, "get_contract") for r in rows]
     items = []

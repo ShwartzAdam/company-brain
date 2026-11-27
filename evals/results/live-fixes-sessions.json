@@ -1,0 +1,444 @@
+{
+ "S4-constraint-carry": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "d83434e07df2c5f175f6a754b0fada58"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "b46ddb9516b05ab01f05a7d0d85930b3"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "b348bab5f994b16aa24a1fa9a5a18a6e"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "ec446f2c5a07e30e540487993da98907"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "5": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "8eb39b19dfb873f6d071b2de93f580a0"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "0ad80c664d9a143de9606c7d14618a96"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "7": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "5818de1560461fe5d4b2f8852b6c0ca2"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.3333333333333333,
+      "tool_selection": 0.0
+     },
+     "trace_id": "27ebd02325339b24b7f445b101e715f5"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "list_access_requests",
+    "search_documents"
+   ]
+  },
+  "9": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "7232cef317ebb595e245f50d2d3e5797"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S6-boundary-clean": {
+  "1": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "23a36bc1dac688af33f5351dd56882b5"
+    }
+   ],
+   "fails": [
+    "missing fact 'MFA'",
+    "missing fact 'device|trust'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "2ef84c6c84a0d62a0f0eda37b4009c12"
+    }
+   ],
+   "fails": [
+    "missing fact 'E010'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "e1ba196ea96586eca5e63d36215bdeb2"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "pending",
+   "tools": []
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "e2d734eac233e4f2a896f7a988beb8a6"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "pending",
+   "tools": [
+    "search_documents"
+   ]
+  }
+ },
+ "S7-boundary-noisy": {
+  "1": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "0bf0c849b027029d47e2089f0283d137"
+    }
+   ],
+   "fails": [
+    "missing fact 'MFA'",
+    "missing fact 'device|trust'"
+   ],
+   "passes": 0,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "1728d7f451f18fd1bc945e3f19553aae"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "02ed089d1b33b946ebfa3e08c71b9dbc"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "24b616e1486aab619d50a462fe3cdf69"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "pending",
+   "tools": [
+    "list_access_requests",
+    "search_documents"
+   ]
+  }
+ },
+ "S8-boundary-heavy-noise": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "1a21271891a4f5b626f47d7c6a6030c1"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "ee543be4b1fa69e5f4445c40ea8ae999"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "0e726fd82c6d05d289083a8196a61a0c"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "00cd4fdaecdfc821808a7d0958b795b7"
+    }
+   ],
+   "fails": [],
+   "passes": 1,
+   "runs": 1,
+   "status": "pending",
+   "tools": [
+    "list_access_requests",
+    "search_documents"
+   ]
+  }
+ }
+}
