@@ -3,7 +3,9 @@ import asyncio
 
 from mcp.shared.memory import create_connected_server_and_client_session as connect
 
-from brain import db, gate, tools
+from brain.webex import gate
+
+from server import db, tools
 from brain.mcp_client import Toolbox
 from server.server import mcp
 

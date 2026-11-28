@@ -1,4 +1,4 @@
-"""streamlit run scripts/ui.py   (MCP server must be running: python server/server.py)
+"""streamlit run scripts/ui.py   (MCP server must be running: python -m server.server)
 Thin wrapper over the same handle_turn the tests call. Caller/group are sidebar inputs, never message text."""
 import sys
 import uuid

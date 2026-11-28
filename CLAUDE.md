@@ -1,7 +1,7 @@
 # CLAUDE.md: Company Brain (NovaOps final project)
 
 Spec: `PROJECT-DESCRIPTION.md` in the course folder is the source of truth. Build from the spec,
-not from open-ended prompting. Plan and findings: `PLAN-VALIDATION.md`, `KNOWN-TRAPS.md`.
+not from open-ended prompting. Plan and findings: `docs/PLAN-VALIDATION.md`, `docs/KNOWN-TRAPS.md`.
 
 ## Rules the agent must follow
 - Fixed stack: Bedrock (Nova 2 Lite), Langfuse, Python, tools behind an MCP server boundary.

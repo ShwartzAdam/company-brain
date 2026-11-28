@@ -2,9 +2,9 @@
   python evals/leak_check.py   (exit 1 on any leak)"""
 import sys
 
-from _common import GOLD  # noqa: F401
+from _common import GOLD  # noqa: F401  imported for its side effect: _common puts the repo root on sys.path
 
-from brain import opensearch, people, retrieval
+from server import opensearch, people, retrieval
 
 c = opensearch.client()
 QUERIES = ["how do I get promoted", "promotion cycle dates", "how do I run a performance review",

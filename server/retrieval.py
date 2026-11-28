@@ -7,7 +7,9 @@ import re
 
 from langfuse import get_client, observe
 
-from brain import config, llm, people
+from brain import config, llm
+
+from server import people
 
 SRC = ["text", "source", "corpus", "audience", "title", "section", "doc_type", "system"]
 POOL = 30      # candidates fetched per query before fusion/rerank
@@ -86,7 +88,7 @@ def _reserve_policy(query: str, caller_id: str, hits: list[dict], q) -> list[dic
 
 
 MUST_CONTRACTS = 2
-MUST_POLICIES = 2      # the model picks the governing policies among policies only
+MUST_POLICIES = 2      # variant c: policy picks the final rerank may not drop (the model chooses which, among policies only)
 MUST_MEMOS = 1         # a memo supersedes policy text; kept only when it also scored in the general pool
 MEMO_POOL_RANK = 15
 TYPED = ("contract", "kb_article", "memo")  # variant c: the document types that answer a question about a system
@@ -148,14 +150,13 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
            mode: str = "rerank") -> list[dict]:
     """mode: vector | hybrid | rerank."""
     if os_client is None:
-        from brain import opensearch
+        from server import opensearch
         os_client = opensearch.client()
     def q(body, raw=False):
         r = os_client.search(index=config.INDEX_NAME, body=body)
         return r if raw else r["hits"]["hits"]
     if mode == "rerank" and os.getenv("RETRIEVAL_VARIANT", "base") == "c":
-        # `corpus` is a preference here, not a wall: a model that guesses the wrong corpus must still reach the
-        # contract or policy that holds the answer. The audience filter stays in every query.
+        # `corpus` is a preference, not a wall (see the branch below); here it only puts its documents first in the pool.
         docs, must = _doc_candidates(query, caller_id, None, q)
         if corpus:
             pref = rrf([q(build_body(query, caller_id, POOL, corpus)), q(build_keyword_body(query, caller_id, POOL, corpus))])

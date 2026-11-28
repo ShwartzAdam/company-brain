@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from brain import config, ingest, llm  # noqa: E402
+from brain import config, llm  # noqa: E402
+from server import ingest
 
 SYSTEM = ("Write ONE sentence (max 35 words) saying what this document is about and which questions it answers: "
           "name the systems, roles or processes it covers. For a general policy, say what kinds of requests it "

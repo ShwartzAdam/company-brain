@@ -1,4 +1,4 @@
-"""NovaOps MCP server (localhost only). Every tool is a thin wrapper over brain.tools.
+"""NovaOps MCP server (localhost only). Every tool is a thin wrapper over server/tools.py.
 caller_id is an argument supplied by the application, never parsed from message text."""
 import functools
 import inspect
@@ -7,7 +7,9 @@ from langfuse import get_client
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.server import Settings as _S
 
-from brain import config, tools
+from brain import config
+
+from server import tools
 
 _S.model_rebuild()
 mcp = FastMCP("novaops", host=config.MCP_HOST, port=config.MCP_PORT)

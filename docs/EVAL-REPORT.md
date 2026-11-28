@@ -6,7 +6,7 @@ Result files: `evals/results/eval-current-{sessions,webex,maya,maya-r2,maya-r3,r
 ## Headline
 - Setup is green: 138 tests pass, secret scan clean, all 5 service checks pass. Judges separate good from bad (10/10 hand-written cases).
 - The 27 rehearsal traces are all followable (27/27, `trace_checks`). By reading the answers, 14 are ready, 10 are partly right and 3 are wrong.
-- **The biggest single defect is a code bug, not the model.** The `answer_agrees` guard (`brain/status.py` `_GRANT`) matches negated sentences such as "No access request has been filed yet" and replaces the whole good answer with a canned line. It fired on 11 of 165 traces. It explains almost every S6/S7/S8 miss, and it damaged submission trace `W-S-01 t4`.
+- **The biggest single defect is a code bug, not the model.** The `answer_agrees` guard (`brain/answer/status.py` `_GRANT`) matches negated sentences such as "No access request has been filed yet" and replaces the whole good answer with a canned line. It fired on 11 of 165 traces. It explains almost every S6/S7/S8 miss, and it damaged submission trace `W-S-01 t4`.
 - Second: the model reads the "Q3 SaaS freeze" as "nothing can be bought or provisioned" and repeats it through `M-S-01` (t1, t2, t3, t8, t9, t12).
 
 ## Numbers (3 runs per turn; turn passes out of 3)

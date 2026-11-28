@@ -2,7 +2,7 @@
 and what outranked it. python evals/diagnose.py"""
 from _common import GOLD
 
-from brain import opensearch, retrieval
+from server import opensearch, retrieval
 
 c = opensearch.client()
 cases = [(x["case_id"], x["query"], x["expected_documents"]) for x in GOLD["retrieval_expectations"]]

@@ -5,7 +5,7 @@ with an earlier file; a turn that passed before and fails now is a regression (e
 
   python evals/session_replay.py                         # all sessions, 1 run
   python evals/session_replay.py S1-quick-policy S3-intent-shift --runs 3 --label step2
-  python evals/session_replay.py --label step3 --baseline evals/results/step2.json
+  python evals/session_replay.py --label step3 --baseline evals/results/history/step2.json
 """
 import argparse
 import json
@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import checks  # noqa: E402
 from brain import config  # noqa: E402
-from brain.scope import WRITE_TOOLS  # noqa: E402
+from brain.graph.scope import WRITE_TOOLS  # noqa: E402
 
 AS_OF = "2026-07-01T12:00:00Z"
 RESULTS = Path(__file__).resolve().parent / "results"
@@ -110,7 +110,7 @@ def main():
     a = ap.parse_args()
 
     from langfuse import get_client
-    from brain import db
+    from server import db
     from brain.agent import handle_turn
 
     data = json.loads((config.ROOT / "data" / "GOLDEN-DATASETS.json").read_text())

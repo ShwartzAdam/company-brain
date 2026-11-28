@@ -9,7 +9,8 @@ os.environ["LANGFUSE_TRACING_ENABLED"] = "false"  # tests never send traces
 os.environ.setdefault("CONSENT_SECRET", "test-secret-not-a-real-one")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from brain import db, llm  # noqa: E402
+from brain import llm  # noqa: E402
+from server import db
 
 
 class FakeBackend:
@@ -24,6 +25,19 @@ class FakeBackend:
     def embed(self, text):
         h = hashlib.sha256(text.encode()).digest()
         return [b / 255 for b in h] * 32
+
+
+class NoBedrock:
+    """Default backend in every test: a test that forgot fake_llm/scripted fails instead of paying for Bedrock."""
+    def __getattr__(self, name):
+        raise RuntimeError("test tried to call Bedrock: use the fake_llm or scripted fixture")
+
+
+@pytest.fixture(autouse=True)
+def no_bedrock():
+    llm.set_backend(NoBedrock())
+    yield
+    llm.set_backend(None)
 
 
 @pytest.fixture

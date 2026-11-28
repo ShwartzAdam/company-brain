@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from session_replay import AS_OF, RESULTS, has  # noqa: E402
 
-from brain.scope import WRITE_TOOLS  # noqa: E402
+from brain.graph.scope import WRITE_TOOLS  # noqa: E402
 
 S2, S3, S4, S9 = "S2-onboarding-maya", "S3-intent-shift", "S4-constraint-carry", "S9-maya-own-account"
 DATE = "2026-08-01|August 1|Aug 1|1 August"
@@ -168,7 +168,7 @@ TABLES = ("tickets", "access_requests", "approvals", "write_keys", "audit_log", 
 
 
 def snapshot() -> dict:
-    from brain import db
+    from server import db
     return {t: hashlib.sha256(repr(db.rows(f"SELECT * FROM {t} ORDER BY 1")).encode()).hexdigest()[:12] for t in TABLES}
 
 
@@ -210,7 +210,9 @@ def main():
         print("REC " + json.dumps(run_turns(_session_with_caller(sid), int(first), int(last), thread, Path(ck))))
         return
 
-    from brain import config, db
+    from brain import config
+
+    from server import db
     ck = config.ROOT / "state" / "maya_checks.db"
     recs, before, after = [], {}, {}
     replay = None

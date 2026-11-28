@@ -1,7 +1,8 @@
 """Regression checks for review findings #1, #3, #4, #5, #6, #8 (pure string logic, no model)."""
-from brain.claims import ground
-from brain.graph import ambiguous_first_name, clean_citations
-from brain.status import claims_done
+from brain.answer.claims import ground
+from brain.answer.claims import clean_citations
+from brain.graph.evidence import ambiguous_first_name
+from brain.answer.status import claims_done
 
 E = "db:employees/E010"
 

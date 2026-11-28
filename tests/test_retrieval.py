@@ -1,4 +1,4 @@
-from brain import retrieval
+from server import retrieval
 
 
 def _hit(i, corpus="employment", source=None):
@@ -41,7 +41,7 @@ class _Capture:
 
 def test_playbook_unreachable_for_non_manager_even_when_named_and_open_for_a_manager(fake_llm):
     """Fail closed at retrieval: every query body a non-manager sends carries audience=all, whatever corpus is asked for."""
-    from brain import tools
+    from server import tools
     for who, is_mgr in (("E001", False), ("E010", False), ("E018", True)):
         cap = _Capture()
         retrieval.search("what does the manager's guide say about feedback", who, k=5, corpus="manager_playbook", os_client=cap)
@@ -51,7 +51,7 @@ def test_playbook_unreachable_for_non_manager_even_when_named_and_open_for_a_man
             assert ("'audience': 'all'" in s) != is_mgr, (who, s)
     # the tool path: an unknown or hallucinated corpus is dropped, the audience filter is not
     cap = _Capture()
-    import brain.opensearch as os_mod
+    import server.opensearch as os_mod
     orig = os_mod.client
     os_mod.client = lambda: cap
     try:
@@ -79,7 +79,7 @@ def test_variant_c_keeps_best_contract_and_policy(monkeypatch):
     assert len(out) == 5 and {"7", "8"} <= set(out) and out[:3] == ["0", "1", "2"]
 
 
-def test_variant_c_corpus_is_a_preference_not_a_wall(monkeypatch):
+def test_variant_c_corpus_is_a_preference_not_a_wall(monkeypatch, fake_llm):
     """A model that asks for corpus=policies must still be able to receive the contract; audience stays hard."""
     seen = {}
     contract = _hit(7, "contracts")

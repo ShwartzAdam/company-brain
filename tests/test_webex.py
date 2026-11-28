@@ -10,11 +10,15 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session as connect
 
-from brain import agent, config, db, gate, retrieval, tools
+from brain import agent, config
+
+from brain.webex import gate
+
+from server import db, retrieval, tools
 from brain.mcp_client import Toolbox
-from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
-from brain.plan import TurnPlan
-from brain.webex import AccessDecision
+from brain.graph.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
+from brain.graph.plan import TurnPlan
+from brain.webex.webex import AccessDecision
 from server.server import mcp
 
 AS_OF = "2026-07-01T12:00:00Z"

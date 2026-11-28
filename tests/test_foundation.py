@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from brain import db, gate, ingest, people, retrieval, tools
+from brain.webex import gate
+
+from server import db, ingest, people, retrieval, tools
 
 ROOT = Path(__file__).resolve().parent.parent
 AS_OF = "2026-07-01T12:00:00Z"
@@ -115,8 +117,8 @@ def test_survives_restart():
 
 
 def test_single_write_release():
-    """Only release_write commits; no other function in brain/tools.py or server/ does."""
-    for p in [ROOT / "brain/tools.py", ROOT / "server/server.py"]:
+    """Only release_write commits; no other function in server/ does."""
+    for p in [ROOT / "server/tools.py", ROOT / "server/server.py"]:
         for fn in [n for n in ast.walk(ast.parse(p.read_text())) if isinstance(n, ast.FunctionDef)]:
             src = ast.get_source_segment(p.read_text(), fn)
             if fn.name != "release_write":

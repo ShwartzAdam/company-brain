@@ -28,7 +28,11 @@ import session_replay as sr  # noqa: E402
 import webex_checks as wc  # noqa: E402
 import judge  # noqa: E402
 
-from brain import agent, config, db, gate  # noqa: E402
+from brain import agent, config  # noqa: E402
+
+from brain.webex import gate
+
+from server import db
 
 JUDGE = {"on": True}  # --no-judge turns the model-judged scores off (they cost a call each)
 TABLES = ("tickets", "access_requests", "approvals", "audit_log", "write_keys", "consents")
@@ -86,7 +90,7 @@ def run_case(c: dict, run: int, ck: Path) -> dict:
         agent.handle_turn(c["caller"], c["group"], tid, c["message"], sr.AS_OF, checkpoint_path=ck)       # replay, same thread
         out["fails"] += wc.check_replay(first, snap())              # nothing at all changes, not even the write ledger
         agent.handle_turn(c["caller"], c["group"], tid + "-new", c["message"], sr.AS_OF, checkpoint_path=ck)  # replay, new thread
-        now = snap()                                                # a new conversation adds ledger keys, never business rows
+        now = snap()
         LEDGERS = ("write_keys", "consents")  # a new conversation adds ledger rows, never business rows
         out["fails"] += wc.check_replay({k: v for k, v in first.items() if k not in LEDGERS}, {k: v for k, v in now.items() if k not in LEDGERS})
         first = now

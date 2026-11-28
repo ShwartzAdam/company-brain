@@ -1,4 +1,4 @@
-"""The graph's only way to reach tools: an MCP session. Never imports brain.db/tools/retrieval.
+"""The graph's only way to reach tools: an MCP session. Never imports server/ (db, tools, retrieval).
 caller_id is injected here from the application's argument, whatever the model wrote."""
 import asyncio
 import contextlib

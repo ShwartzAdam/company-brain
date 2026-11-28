@@ -31,7 +31,7 @@ class Fake:
 
 async def main(mode, ck):
     llm.set_backend(Fake())
-    from brain import retrieval
+    from server import retrieval
     retrieval.search = lambda *a, **k: [{"source": "documents/it_kb/webex_login.md", "text": "t", "section": "s", "audience": "all", "score": 1}]
     async with connect(mcp._mcp_server) as s:
         box = await Toolbox(s, "E010").load()

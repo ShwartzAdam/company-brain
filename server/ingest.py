@@ -167,7 +167,7 @@ def load_chunks() -> list[dict]:
 def run(recreate: bool = True) -> int:
     from opensearchpy import helpers
 
-    from brain import opensearch
+    from server import opensearch
     c = opensearch.client()
     if recreate:
         opensearch.recreate_index(c)
