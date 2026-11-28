@@ -39,7 +39,7 @@ Maya checks (`maya_checks.py`, 3 runs). `writes`, `handoff`, `restart`, `argumen
 | 7 | S8 t3 run 2: "Sara needs Webex to join a client demo": wrong person (the caller) and an invented reason. Classify had `subject Rachel Stein`, `requires_tools: false`, gather none | flaky 2/3 | answer prompt (plan subject not passed to answer) | trace | pass `subject_name` and `system_name` into the answer body | S |
 | 8 | S3 t7 flaky: run 2 `requires_tools: false` (no search; answer says the addendum "does not add" anything); run 3 searched but missed MDM/MFA | flaky 1/3 | classify, then evidence budget/answer | traces | none cheap; re-check after 3 | M |
 | 9 | "Give Daniel access to the tool." should be ambiguous (two Daniels, no system). Model picked E017 and talked about Webex | not in the 27; 1 probe | classify (dup-name trap A5) | probe trace 79d9816 | treat a first name that matches 2+ employees as `ambiguous` in code | M |
-| 10 | S1 t3, S3 t7 `tool use` expectation | S1 t3 always | check/dataset expectation | answer "IT" is right | update the expectation (`should_use_tools` is not binding per the golden readme) | S |
+| 10 | S1 t3, S4 t1 `tool use` expectation | S1 t3 always | planner (searches when no tool is needed) | answer "IT" is right | **Correction:** the golden README lists `should_use_tools` as BINDING and forbids relaxing it, so this is a real defect, not a stale expectation. Do not edit the expectation; fix the planner or the first-turn and freeze lookup rules | M |
 
 ## Manual read of answers (14 read from the 27, plus 6 probes; none relied on the automated check alone)
 | Item | Verdict | Why |
@@ -70,7 +70,7 @@ Maya checks (`maya_checks.py`, 3 runs). `writes`, `handoff`, `restart`, `argumen
 2. Freeze wording in `ANSWER_SYSTEM` and threshold carry (#2, #3).
 3. Citation sanitiser (#6), date reasoning (#4), S4 t1 override and its flag (#5).
 4. Pass `subject_name` into the answer (#7); `ambiguous` for duplicate names (#9).
-5. Update the S1 t3 and S4 t1 expectations (#10).
+5. S1 t3 and S4 t1 are real defects (see the correction in #10); do not relax their expectations.
 Then re-run the rehearsal and re-read M-S-01 t1, t2, t12, M-S-02 t5, W-S-01 t4.
 
 ## Not run or not verified
