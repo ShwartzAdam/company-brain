@@ -55,11 +55,14 @@ def check_software_subscription(software: str) -> list[dict]:
         "WHERE lower(sys.system_name) LIKE lower(?) OR lower(v.vendor_name) LIKE lower(?) "
         "ORDER BY sys.system_name", (like, like))
     order = ["subscription_id", "system_name", "vendor_name", "contract_id", "seat_limit", "active_seats", "over_limit",
-             "annual_cost", "above_q3_threshold", "seats_available", "status", "renewal_date"]
+             "annual_cost", "annual_cost_above_threshold", "cost_per_seat", "seats_available", "status", "renewal_date"]
     for s in out:  # comparisons are made here, in code; the model is handed the answer (short rows: facts keep 240 characters)
         s["seats_available"] = s["seat_limit"] - s["active_seats"]
         s["over_limit"] = s["active_seats"] > s["seat_limit"]
-        s["above_q3_threshold"] = (s["annual_cost"] or 0) > config.Q3_APPROVAL_THRESHOLD
+        # the WHOLE contract cost against the threshold (a question about what a subscription costs). The memo applies the threshold
+        # to an expansion's increase, so a question about adding seats uses cost_per_seat x seats added (KNOWN-TRAPS B2).
+        s["annual_cost_above_threshold"] = (s["annual_cost"] or 0) > config.Q3_APPROVAL_THRESHOLD
+        s["cost_per_seat"] = round((s["annual_cost"] or 0) / s["seat_limit"], 2) if s["seat_limit"] else None
     out = [{k: s[k] for k in order} for s in out]
     return _cite(out, "software_subscriptions", "subscription_id")
 

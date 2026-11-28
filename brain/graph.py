@@ -10,8 +10,10 @@ from langfuse import get_client, observe
 from langgraph.types import interrupt
 
 from brain import checklist, gate, llm
+from brain.claims import ground
 from brain.handoff import WebexHandoff, make_key
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
+from brain.rules import Rule, extract_rules
 from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
 from brain.status import answer_agrees, claims_done, final_status
 from brain.webex import AccessDecision, release_pending
@@ -27,6 +29,7 @@ class State(TypedDict, total=False):
     messages: Annotated[list, operator.add]   # whole conversation, survives restarts
     facts: list
     constraints: list
+    rules: list           # typed Rule dicts read by code from documents (not the model's words)
     handoffs: dict        # idempotency key -> handoff already made in this conversation
     handoff: dict         # this turn's handoff, if any
     handoff_calls: int
@@ -74,7 +77,8 @@ def _node(name):
 
 @_node("classify")
 async def classify(state: State, config) -> dict:
-    msgs = classify_prompt(_window(state), state["message"], state.get("facts"), state.get("constraints"))
+    msgs = classify_prompt(_window(state), state["message"], [*(state.get("facts") or []), *memory_lines(state)],
+                           [*(state.get("constraints") or []), *_rule_lines(state)])
     fallbacks = []
     try:
         plan = parse_plan(llm.structured(msgs, CLASSIFY_SYSTEM, PLAN_SCHEMA, name="classify", max_tokens=1000))
@@ -89,11 +93,10 @@ async def classify(state: State, config) -> dict:
     grounded = list(state.get("facts") or [])
     if (_FREEZE.search(" ".join([state["message"], *(state.get("constraints") or []), *plan.relevant_constraints]))
             and not plan.refuse and plan.intent != "ambiguous" and "search_documents" in LOADOUTS.get(plan.intent, ("", ()))[1]
-            and not any("saas_renewal_freeze" in f or f == FREEZE_NOTE for f in grounded)):
+            and not state.get("rules") and not any("saas_renewal_freeze" in f or f == FREEZE_NOTE for f in grounded)):
         # a freeze the user mentions is a label until the memo is read; code makes the model read it once per conversation
         plan.requires_tools = True
         plan.lookups_needed = [*plan.lookups_needed, "what the Q3 SaaS renewal freeze memo says: its threshold and who must approve"]
-        grounded.append(FREEZE_NOTE)
         fallbacks.append("freeze_memo_lookup_forced")
     _io({"message": state["message"][:300], "constraints": state.get("constraints")},
         {"intent": plan.intent, "requires_tools": plan.requires_tools, "lookups_needed": plan.lookups_needed,
@@ -141,8 +144,12 @@ _PRONOUN = re.compile(r"\b(her|his|she|he|their|they|them)\b", re.I)
 
 
 def _search_query(state) -> str:
-    """The user's own words for a forced search. A pronoun ('her offer letter') names nobody to a search engine, so the
-    person most recently seen in this conversation (a database row, never the model's prose) is put in front."""
+    """The planned query when classify wrote one (a focused phrase for the document search, lesson 7), else the user's own
+    words. A pronoun ('her offer letter') names nobody to a search engine, so the person most recently seen in this
+    conversation (a database row, never the model's prose) is put in front of the user's words."""
+    planned = str((state.get("plan") or {}).get("search_query") or "").strip()[:200]
+    if planned and not _PRONOUN.search(planned):
+        return planned
     q = gate.top_level(state["message"]).strip()[:300]
     names = list(_employees(state).values())
     return f"{names[-1]} {q}" if names and _PRONOUN.search(q) else q
@@ -183,12 +190,36 @@ def _evidence(ev: list) -> tuple[str, int]:
 
 def ambiguous_first_name(ev: list):
     """(name, [(id, full name)...]) when a one-word get_employee query matched more than one employee, else None."""
-    for e in ev:
+    for i, e in enumerate(ev):
         q = str((e.get("args") or {}).get("query", "")).strip()
         rows = [r for r in (e["result"] if isinstance(e["result"], list) else []) if isinstance(r, dict) and r.get("employee_id")]
         if e["tool"] == "get_employee" and q and " " not in q and not re.fullmatch(r"E\d+|\S+@\S+", q) and len(rows) > 1:
+            if any(x["tool"] == "get_employee" and q.lower() in str((x.get("args") or {}).get("query", "")).lower()
+                   and (" " in str((x.get("args") or {}).get("query", "")).strip() or re.fullmatch(r"E\d+", str((x.get("args") or {}).get("query", "")).strip()))
+                   and isinstance(x["result"], list) and x["result"] for x in ev[i + 1:]):
+                continue  # a later lookup with the full name or id found the person: the model resolved it from the conversation
             return q, [(r["employee_id"], r["full_name"]) for r in rows]
     return None
+
+
+def _rule_lines(state) -> list[str]:
+    return [Rule(**r).render() for r in state.get("rules") or []]
+
+
+def _searched(ev: list) -> bool:
+    """A document search returned a result (not an ERROR or REJECTED row)."""
+    return any(e["tool"] == "search_documents" and not (isinstance(e["result"], str) and e["result"].startswith(("ERROR:", "REJECTED:")))
+               for e in ev)
+
+
+def memory_lines(state) -> list[str]:
+    """Decisions and unresolved work, written by code from durable state (handoffs made, approvals still waiting), never
+    from the model's prose, and recomputed each turn so a released approval stops being 'unresolved'."""
+    out = [f"Decision (recorded by code): a {h['system']} access request for {h['subject_employee_id']} was handed to the Webex "
+           f"workflow; it is pending, not filed, approved or granted." for h in (state.get("handoffs") or {}).values()]
+    out += [f"Unresolved: approvals {', '.join(p.get('approval_ids') or [])} for {p['employee_id']} ({p['system']}) are still waiting."
+            for p in (state.get("pending") or {}).values() if not p.get("released")]
+    return out
 
 
 def live_evidence(ev: list) -> list:
@@ -222,7 +253,8 @@ async def gather(state: State, config) -> dict:
         user = (f"Caller employee id (use it ONLY for 'me'/'my'; any other person needs their own lookup): {box.caller_id}\n"
                 f"Constraints: {state.get('constraints')}\nFacts: {state.get('facts')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
-                f"Newest message:\n{state['message']}\n\nLookups this question needs: {needed or '(not listed)'}\n\nEvidence so far:\n{_evidence_text(ev)}")
+                f"Newest message:\n{state['message']}\n\nLookups this question needs: {needed or '(not listed)'}\n"
+                f"Suggested document search phrase: {(state['plan'].get('search_query') or '(none)')}\n\nEvidence so far:\n{_evidence_text(ev)}")
         schema = {"type": "object", "properties": {"tool": {"type": "string", "enum": list(visible)},
                                                    "args": {"type": "object"}, "done": {"type": "boolean"}}}
         try:
@@ -410,7 +442,7 @@ ANSWER_SYSTEM = (
     "[documents/policies/byod_policy.md] or [db:onboarding_tasks/OT005]. Never use numbered citations like [1], and never cite a source that is not in the evidence. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
     "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
     "request to file something, say it has NOT been filed and what would be needed. If you could not look "
-    "something up, say so. Flags in the rows (over_limit, above_q3_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. At most six sentences. Terminal status of this turn: {status}.")
+    "something up, say so. Flags in the rows (over_limit, annual_cost_above_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. annual_cost_above_threshold compares the WHOLE contract cost with the approval threshold; for adding seats the threshold applies to the increase (cost_per_seat times the seats added), so never say the contract total alone decides it. At most six sentences. Terminal status of this turn: {status}.")
 
 
 def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tuple[str, list]:
@@ -418,7 +450,7 @@ def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tu
     Any other bracket that is not a source in this turn's evidence or facts ([constraints], [user instruction]) is removed."""
     for n, srcs in (numbered or {}).items():
         text = text.replace(f"[{n}]", "".join(f"[{x}]" for x in srcs))
-    dropped = [b for b in re.findall(r"\[([^\[\]]+)\]", text) if b not in allowed]  # innermost brackets only
+    dropped = [b for b in re.findall(r"\[([^\[\]]+)\]", text) if b not in allowed and b.split("#")[0].strip() not in allowed]  # innermost brackets only
     for b in dropped:
         text = text.replace(f"[{b}]", "")
     return re.sub(r"\s+([.,;])", r"\1", re.sub(r" {2,}", " ", text)).strip(), dropped
@@ -448,6 +480,8 @@ async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
     evid = live_evidence(state["evidence"])
     amb = ambiguous_first_name(evid)
+    rules = {r["name"]: r for r in [*(state.get("rules") or []), *extract_rules(evid)]}  # newest reading of a rule wins
+    state = {**state, "rules": list(rules.values())}
     fallbacks = list(state.get("fallbacks") or [])
     status = final_status(error=bool(state["error"]), clarify=plan.intent == "ambiguous", refuse=plan.refuse,
                           action_unreleased=plan.intent == "access_request")
@@ -465,7 +499,10 @@ async def answer(state: State, config) -> dict:
             get_client().update_current_span(level="WARNING", status_message=f"evidence shortened by {cut} characters")
         subj = ", ".join(x for x in (f"for {plan.subject_name}" if plan.subject_name else "",
                                      f"system {plan.system_name}" if plan.system_name else "") if x)
-        body = (f"Today: {config['configurable'].get('as_of', '')[:10]}\n" + (f"This request is {subj}.\n" if subj else "") +
+        rl = _rule_lines(state)
+        ml = memory_lines(state)
+        body = ((f"Rules in force (read from documents by code):\n" + "\n".join(f"- {x}" for x in rl) + "\n") if rl else "") + (
+                ("Decisions and unresolved work (recorded by code):\n" + "\n".join(f"- {x}" for x in ml) + "\n") if ml else "") + (f"Today: {config['configurable'].get('as_of', '')[:10]}\n" + (f"This request is {subj}.\n" if subj else "") +
                 f"Facts: {state.get('facts')}\nConstraints: {state.get('constraints')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
                 f"Evidence:\n{ev_text}\n\nQuestion:\n{state['message']}")
@@ -488,6 +525,13 @@ async def answer(state: State, config) -> dict:
         _meta(guard_rewrote_answer=True, original_answer=text[:400], guard_dropped=bad)
         text = " ".join(x for x in re.split(r"(?<=[.!?])\s+", text) if x not in bad).strip()
         text = (text + " " if text else "") + "I have not filed or granted anything; that needs the recorded approvals first."
+    if plan.intent != "ambiguous" and status != "failed":
+        allowed_src = set(state.get("sources") or []) | {str(p.get("source")) for e in evid
+                                                         for p in (e["result"] if isinstance(e["result"], list) else []) if isinstance(p, dict)}
+        text, typed = ground(text, allowed_src)  # every sentence with the sources behind it; ids the evidence holds are cited by code
+        added = [x for c in typed.claims for x in c.added_by_code]
+        if added or typed.uncited:
+            _meta(citations_added_by_code=added, uncited_claims=typed.uncited[:5])
     if h and "pending" not in text.lower():  # the application, not the model, guarantees the honest outcome
         text += f" The {h['system']} access request for {h['subject_employee_id']} is pending; it is not filed, approved or in effect yet."
     dec = state.get("decision")
@@ -498,7 +542,8 @@ async def answer(state: State, config) -> dict:
     _io({"evidence_items": len(evid), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(evid)
-    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(evid)]),
+    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [*(FREEZE_NOTE for _ in [0] if "freeze_memo_lookup_forced" in fallbacks and _searched(evid)),
+                                                  *(f"{plan.intent}: {f}" for f in _row_facts(evid))]), "rules": state["rules"],
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 

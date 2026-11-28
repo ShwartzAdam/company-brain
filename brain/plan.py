@@ -66,6 +66,10 @@ class TurnPlan(BaseModel):
         "For an access request: the full name of the person it is for, taken from the user's words or the Known "
         "facts ('her' means the person named earlier, not the caller); otherwise empty."))
     system_name: str = Field(default="", description="For an access request: the system asked for, e.g. Webex; else empty.")
+    search_query: str = Field(default="", description=(
+        "When a document must be searched: ONE focused search phrase naming the document type and the subject "
+        "(e.g. 'Maya Cohen offer letter equipment', 'Q3 SaaS renewal freeze approval threshold'), without pronouns, "
+        "greetings or pasted text; otherwise empty."))
     closes_topic: str = Field(default="", description=(
         "If the user closes, drops or marks resolved an earlier topic in THIS message, a short description of that topic "
         "in the user's words, naming the person; otherwise an empty string."))
@@ -95,8 +99,16 @@ def render(messages: list[dict]) -> str:
     return "\n".join(f"[{m['role']}] {m['content']}" for m in messages) or "(first turn)"
 
 
+def _cap_replies(messages: list[dict], limit: int = 400) -> list[dict]:
+    """The planner needs to know what was said, not read it again: an assistant reply is cut at `limit` characters
+    (lesson 10 caps what the planner re-reads at 400). The user's own words are never cut."""
+    return [{**m, "content": m["content"][:limit] + " ...[cut]"} if m["role"] == "assistant" and len(m["content"]) > limit else m
+            for m in messages]
+
+
 def classify_prompt(history: list[dict], message: str, facts: list[str], constraints: list[str]) -> list[dict]:
     b = lambda xs: "\n".join(f"  - {x}" for x in (xs or [])) or "  - (none)"  # noqa: E731
+    history = _cap_replies(window(history))
     body = (f"Known facts:\n{b(facts)}\nConstraints in force:\n{b(constraints)}\n\n"
-            f"Recent conversation:\n{render(window(history))}\n\nNewest message:\n{message}")
+            f"Recent conversation:\n{render(history)}\n\nNewest message:\n{message}")
     return [{"role": "user", "content": body}]

@@ -5,21 +5,21 @@ Read from the lesson docs (lessons 2, 3, 5-13) and the lesson 10 code. `ai-cours
 
 ## 1. Structured output: force it, then validate (L3, L6, L7)
 - Lessons force JSON through a **forced tool call** (Bedrock `toolConfig`), validate it with `jsonschema`, and retry only on failures worth retrying. Planner, tagger, reranker and judges all work this way.
-- **Status: done for classify and gather** (uncommitted). `llm.structured()` uses a forced Bedrock tool call and returns schema-valid JSON or raises; a backend without it falls back to `_json_from_text`. Free-text `llm.complete` remains for the answer and the retrieval rerank. No distil step exists yet.
+- **Status: done for classify and gather**. `llm.structured()` uses a forced Bedrock tool call and returns schema-valid JSON or raises; a backend without it falls back to `_json_from_text`. Free-text `llm.complete` remains for the answer and the retrieval rerank. No distil step exists yet.
 
 ## 2. The planner (L10 stage 1)
 - One structured plan per turn: intent, facts, constraints, `requires_tools`. A field's description is sent to the model like prompt text, so write descriptions as carefully as prompts.
 - `requires_tools` is False only when every needed fact is already in this conversation. "You know nothing about NovaOps otherwise, so a first turn is almost always True." "Only an answer you could quote from THIS conversation is False."
 - A different topic needs a different document; having retrieved one article does not answer a new question.
 - Drop what the user resolved or abandoned. Plan for the request inside a pasted email, not the signature.
-- **Status: mostly done** (uncommitted). `CLASSIFY_SYSTEM` now has the first-turn/policy/person/record rule, the quotable-answer rule, the DB-facts-are-a-snapshot rule and the pasted-text rule. Still missing: tool results are not truncated in the planner's view (`plan.window` keeps 2 user turns verbatim).
+- **Status: mostly done**. `CLASSIFY_SYSTEM` now has the first-turn/policy/person/record rule, the quotable-answer rule, the DB-facts-are-a-snapshot rule and the pasted-text rule. Planner view: messages hold only user and assistant text (rows live in facts, cut at 240 characters); assistant replies are capped at 400 characters in the classify prompt.
 
 ## 3. Tool loadouts (L10 stage 2, L12)
 - **Relevance fails open, permission fails closed.** Which read tools are visible is an optimisation; which writes may run is a safety property.
 - Each loadout row is deliberately a little wider than needed so a nearby classification error can recover. `other` opens the whole read catalogue.
 - Rearm: if the plan needed a lookup and none ran, widen to all reads once. Never add a write.
 - L12 found a score stuck through five wording changes because `LOADOUTS` never offered the tool. **When a lever does nothing three times, look at what the code makes possible.**
-- **Status: done** (uncommitted). `scope.LOADOUTS['other']` is `READ_TOOLS`; `rearm` in `graph.py` widens to all reads once and never adds a write.
+- **Status: done**. `scope.LOADOUTS['other']` is `READ_TOOLS`; `rearm` in `graph.py` widens to all reads once and never adds a write.
 
 ## 4. Context and memory (L10 stage 3, L12)
 - Graph state is not model context. Build the model's context per node from state.
@@ -27,7 +27,7 @@ Read from the lesson docs (lessons 2, 3, 5-13) and the lesson 10 code. `ai-cours
 - **More raw context made recall worse** in two separate L12 runs (longer tool output, three verbatim turns). Do not widen context to fix recall.
 - Memory is named fields (facts, constraints, decisions, unresolved), not a summary string. Never silently drop a constraint. A rejected memory keeps the raw history. Memory values are a snapshot: "what is it now" needs a tool.
 - Lesson's own result: distillation saves tokens (-12%) but strict task success was lower than the baseline. Treat it as a trade.
-- **Status:** facts are written by code from tool rows (`_row_facts` in `graph.py`), never from the model's prose; classify takes facts and constraints from the user's words only. Facts and constraints still only grow (cap 30). No `memory.py`, distil node or closed-topic handling yet (Step 3).
+- **Status:** facts are written by code from tool rows (`_row_facts` in `graph.py`), never from the model's prose; classify takes facts and constraints from the user's words only. Facts and constraints still only grow (cap 30). Closed topics drop their rows (`closes_topic`), the freeze rule is a typed `Rule`, and decisions and unresolved work are lines written by code from handoffs and pending approvals (`memory_lines`). There is still no distil node and no `memory.py`.
 
 ## 5. Retrieval (L6, L7)
 - Access control is a **metadata filter at retrieval**, from the caller's role, never a refusal after the fact.
@@ -67,9 +67,9 @@ Read from the lesson docs (lessons 2, 3, 5-13) and the lesson 10 code. `ai-cours
 - Several lesson READMEs contain GitHub tokens in their clone commands. Never copy them into this repo, and have them revoked.
 
 ## Priority list for Step 3
-1. ~~Restore `other` to all read tools.~~ Done (uncommitted).
-2. ~~Add the planner's first-turn and quotable-answer rules.~~ Done (uncommitted).
-3. ~~Forced tool-call JSON with validation.~~ Done for classify and gather (uncommitted).
-4. Bounded planner transcript with truncated tool results. Open.
+1. ~~Restore `other` to all read tools.~~ Done.
+2. ~~Add the planner's first-turn and quotable-answer rules.~~ Done.
+3. ~~Forced tool-call JSON with validation.~~ Done for classify and gather.
+4. Bounded planner transcript. Done offline (assistant replies capped at 400 characters); not measured live.
 5. Closed-topic handling, typed handoff, checklist (Step 3 plan).
 6. Re-run `evals/session_replay.py` and `evals/maya_checks.py` against the saved baselines after each change.
