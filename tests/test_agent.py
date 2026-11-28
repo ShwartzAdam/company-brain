@@ -597,6 +597,11 @@ def test_guard_keeps_honest_negations_and_still_catches_claims():
     assert status.answer_agrees("completed", "No access request has been filed or granted, and the rule remains in force.")
     assert status.claims_done("Done. The access request has been filed. I will follow up.") == ["The access request has been filed."]
     assert not status.answer_agrees("pending", "Rachel's access is now granted.")
+    # a negation after the match, or in another clause, must not hide a claim
+    assert status.claims_done("I've granted access, no issues.")
+    assert status.claims_done("Access is now active, nothing pending.")
+    assert status.claims_done("No request has been filed yet, but Rachel's access is now granted.")
+    assert not status.claims_done("I cannot say more, and no access has been granted.")
 
 
 def test_guard_drops_only_the_claiming_sentence(scripted, hits, tmp_path):
@@ -714,3 +719,16 @@ def test_the_rule_is_kept_and_shown_to_the_answer_on_later_turns(scripted, tmp_p
     turn("E004", "Remind me what I said.", "t-r1", tmp_path, "UG_HR")
     body = next(c[0][0]["content"] for c in b.calls if "Rules in force" in c[0][0]["content"])
     assert "above USD 7,500" in body and "Finance" in body
+
+
+def test_wi02_check_accepts_the_wordings_seen_live():
+    """W-I-02 failed 0/3 on a wording list while every answer was right (EVAL-REPORT, PR #30/#31); keep the real wordings accepted."""
+    import json
+    from pathlib import Path
+
+    case = next(c for c in json.loads((Path(__file__).resolve().parents[1] / "evals" / "webex_cases.json").read_text())["cases"]
+                if c["id"] == "W-I-02")
+    answer = ("I cannot tell you which of your team members has a Webex seat because the system only records seat counts, "
+              "not which employee holds a seat. E010's request is blocked [db:access_requests/AR001] and OT005 is blocked.")
+    has = lambda text, spec: any(alt.strip().lower() in text.lower() for alt in spec.split("|"))  # same rule as session_replay.has  # noqa: E731
+    assert all(has(answer, spec) for spec in case["required_facts"])
