@@ -194,10 +194,11 @@ def ambiguous_first_name(ev: list):
         q = str((e.get("args") or {}).get("query", "")).strip()
         rows = [r for r in (e["result"] if isinstance(e["result"], list) else []) if isinstance(r, dict) and r.get("employee_id")]
         if e["tool"] == "get_employee" and q and " " not in q and not re.fullmatch(r"E\d+|\S+@\S+", q) and len(rows) > 1:
-            if any(x["tool"] == "get_employee" and q.lower() in str((x.get("args") or {}).get("query", "")).lower()
-                   and (" " in str((x.get("args") or {}).get("query", "")).strip() or re.fullmatch(r"E\d+", str((x.get("args") or {}).get("query", "")).strip()))
-                   and isinstance(x["result"], list) and x["result"] for x in ev[i + 1:]):
-                continue  # a later lookup with the full name or id found the person: the model resolved it from the conversation
+            ids = {r["employee_id"] for r in rows}
+            if any(x["tool"] == "get_employee" and len(found := [r for r in (x["result"] if isinstance(x["result"], list) else [])
+                                                                  if isinstance(r, dict) and r.get("employee_id")]) == 1
+                   and found[0]["employee_id"] in ids for x in ev[i + 1:]):
+                continue  # a later lookup returned exactly one of the ambiguous people: the model resolved it from the conversation
             return q, [(r["employee_id"], r["full_name"]) for r in rows]
     return None
 
@@ -512,8 +513,8 @@ async def answer(state: State, config) -> dict:
         text = llm.complete([{"role": "user", "content": body}], ANSWER_SYSTEM.format(status=status), max_tokens=700)
     if plan.intent != "ambiguous" and status != "failed":
         allowed = set(state.get("sources") or []) | set(re.findall(r"\[((?:db:|documents/)[^\]]+)\]", " ".join(state.get("facts") or [])))
-        allowed |= {str(p.get("source")) for e in evid for p in (e["result"] if isinstance(e["result"], list) else [])
-                    if isinstance(p, dict)}
+        allowed |= {str(p["source"]) for e in evid for p in (e["result"] if isinstance(e["result"], list) else [])
+                    if isinstance(p, dict) and p.get("source")}
         numbered = {str(i): list(dict.fromkeys(_sources(e["result"])))[:3] for i, e in enumerate(evid, 1)}
         text, dropped = clean_citations(text, allowed, numbered)
         if dropped:
@@ -526,9 +527,7 @@ async def answer(state: State, config) -> dict:
         text = " ".join(x for x in re.split(r"(?<=[.!?])\s+", text) if x not in bad).strip()
         text = (text + " " if text else "") + "I have not filed or granted anything; that needs the recorded approvals first."
     if plan.intent != "ambiguous" and status != "failed":
-        allowed_src = set(state.get("sources") or []) | {str(p.get("source")) for e in evid
-                                                         for p in (e["result"] if isinstance(e["result"], list) else []) if isinstance(p, dict)}
-        text, typed = ground(text, allowed_src)  # every sentence with the sources behind it; ids the evidence holds are cited by code
+        text, typed = ground(text, allowed)  # same set clean_citations used  # every sentence with the sources behind it; ids the evidence holds are cited by code
         added = [x for c in typed.claims for x in c.added_by_code]
         if added or typed.uncited:
             _meta(citations_added_by_code=added, uncited_claims=typed.uncited[:5])

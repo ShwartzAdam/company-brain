@@ -799,7 +799,8 @@ def test_a_first_name_the_model_resolved_by_full_name_does_not_ask():
     one = {"tool": "get_employee", "args": {"query": "Daniel Levi"}, "result": [{"employee_id": "E002", "full_name": "Daniel Levi"}]}
     assert ambiguous_first_name([two]) is not None
     assert ambiguous_first_name([two, one]) is None
-    assert ambiguous_first_name([two, {**one, "args": {"query": "Sara Cohen"}}]) is not None  # someone else's lookup resolves nothing
+    sara = {"tool": "get_employee", "args": {"query": "Sara Cohen"}, "result": [{"employee_id": "E030", "full_name": "Sara Cohen"}]}
+    assert ambiguous_first_name([two, sara]) is not None  # someone else's lookup resolves nothing
 
 
 def test_clean_citations_keeps_every_real_source_shape():
