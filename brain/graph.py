@@ -12,13 +12,15 @@ from langgraph.types import interrupt
 from brain import checklist, gate, llm
 from brain.handoff import WebexHandoff, make_key
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
-from brain.scope import READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
+from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
 from brain.status import answer_agrees, claims_done, final_status
 from brain.webex import AccessDecision, release_pending
 
 MAX_STEPS = 6
 MAX_FACTS = 60
-_GENERIC_SUBJECT = re.compile(r"\b(user|caller|requester|requestor|myself|me|i|employee|hire|joiner|person|someone)\b", re.I)
+FREEZE_NOTE = "note: the Q3 SaaS freeze memo was looked up for this conversation"
+_GENERIC_SUBJECT = re.compile(r"\b(user|caller|requester|requestor|myself|me|i|employee|hire|joiner|person|someone|unspecified|unknown|unnamed|n/a|none|tbd)\b|not provided|\[", re.I)
+_FREEZE = re.compile(r"\bfreeze\b", re.I)
 
 
 class State(TypedDict, total=False):
@@ -84,11 +86,20 @@ async def classify(state: State, config) -> dict:
             and not state.get("messages") and not state.get("facts")):
         plan.requires_tools = True  # the prompt says a first question needs a lookup; code enforces it: nothing to answer from
         fallbacks.append("requires_tools_forced_first_turn")
+    grounded = list(state.get("facts") or [])
+    if (_FREEZE.search(" ".join([state["message"], *(state.get("constraints") or []), *plan.relevant_constraints]))
+            and not plan.refuse and plan.intent != "ambiguous" and "search_documents" in LOADOUTS.get(plan.intent, ("", ()))[1]
+            and not any("saas_renewal_freeze" in f or f == FREEZE_NOTE for f in grounded)):
+        # a freeze the user mentions is a label until the memo is read; code makes the model read it once per conversation
+        plan.requires_tools = True
+        plan.lookups_needed = [*plan.lookups_needed, "what the Q3 SaaS renewal freeze memo says: its threshold and who must approve"]
+        grounded.append(FREEZE_NOTE)
+        fallbacks.append("freeze_memo_lookup_forced")
     _io({"message": state["message"][:300], "constraints": state.get("constraints")},
         {"intent": plan.intent, "requires_tools": plan.requires_tools, "lookups_needed": plan.lookups_needed,
          "system": plan.system_name, "subject": plan.subject_name, "closes_topic": plan.closes_topic, "refuse": plan.refuse},
-        classify_fallback=bool(fallbacks))
-    facts, closed = list(state.get("facts") or []), [c for c in state.get("closed") or [] if c != plan.intent]
+        classify_fallback="classify_default_plan" in fallbacks)
+    facts, closed = grounded, [c for c in state.get("closed") or [] if c != plan.intent]
     if plan.closes_topic:  # the model proposes, code applies: drop the last topic's rows, keep one decision line
         prev = next((m.get("intent") for m in reversed(state.get("messages") or []) if m["role"] == "user"), None)
         if prev and prev != plan.intent:
@@ -385,6 +396,17 @@ ANSWER_SYSTEM = (
     "something up, say so. At most six sentences. Terminal status of this turn: {status}.")
 
 
+def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tuple[str, list]:
+    """[n] is the model pointing at the n-th evidence row printed in its prompt: it becomes that row's real sources.
+    Any other bracket that is not a source in this turn's evidence or facts ([constraints], [user instruction]) is removed."""
+    for n, srcs in (numbered or {}).items():
+        text = text.replace(f"[{n}]", "".join(f"[{x}]" for x in srcs))
+    dropped = [b for b in re.findall(r"\[([^\[\]]+)\]", text) if b not in allowed]  # innermost brackets only
+    for b in dropped:
+        text = text.replace(f"[{b}]", "")
+    return re.sub(r"\s+([.,;])", r"\1", re.sub(r" {2,}", " ", text)).strip(), dropped
+
+
 def _row_facts(evidence: list) -> list[str]:
     """Memory of what the tools returned, written by code: one compact line per database row. Never the
     model's own prose, so a wrong sentence cannot become a fact. (Top document passages are kept too, so a follow-up needs no new search.)"""
@@ -429,6 +451,14 @@ async def answer(state: State, config) -> dict:
             body += (f"\n\nA handoff to the Webex workflow was recorded as PENDING for {state['handoff']['subject_employee_id']} "
                      f"({state['handoff']['system']}). It is not filed, approved or granted.")
         text = llm.complete([{"role": "user", "content": body}], ANSWER_SYSTEM.format(status=status), max_tokens=700)
+    if plan.intent != "ambiguous" and status != "failed":
+        allowed = set(state.get("sources") or []) | set(re.findall(r"\[((?:db:|documents/)[^\]]+)\]", " ".join(state.get("facts") or [])))
+        allowed |= {str(p.get("source")) for e in state["evidence"] for p in (e["result"] if isinstance(e["result"], list) else [])
+                    if isinstance(p, dict)}
+        numbered = {str(i): list(dict.fromkeys(_sources(e["result"])))[:3] for i, e in enumerate(state["evidence"], 1)}
+        text, dropped = clean_citations(text, allowed, numbered)
+        if dropped:
+            _meta(citations_dropped=dropped)
     h = state.get("handoff")
     if not answer_agrees(status, text):
         bad = claims_done(text)  # drop only the sentences that claim an action; keep the rest of the answer

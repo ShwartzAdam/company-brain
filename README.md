@@ -103,7 +103,7 @@ One turn = one trace, root `agent.turn` (type AGENT), grouped into its conversat
 agent.turn            input: the message; output: the answer
                       metadata: caller_id, caller_group, scope, intent, visible_tools, tool_sequence, status, request_id,
                                 case_id, turn, as_of, paused, fallbacks, trajectory (calls + truncated results)
-  classify            input message -> output intent, requires_tools, lookups_needed; classify_fallback flag
+  classify            input message -> output intent, requires_tools, lookups_needed; `classify_fallback` is true only when the default plan was used (code overrides are listed in `fallbacks`)
     llm.structured:classify     (generation: model, usage)
   scope               intent -> scope + visible tools (write_tools_visible)
   gather              tool_sequence, rejected calls, error
@@ -146,7 +146,7 @@ Every call that can hang is bounded (`brain/config.py`, overridable in `.env`): 
 
 ## Evidence and lookups (issue #19)
 - **Evidence budget:** the model sees up to 12,000 characters of tool evidence per turn, shared between results (no result below 1,500). Long document text is shortened row by row and each cut row ends with `[truncated, N more characters]`; a turn that cut anything records `evidence_truncated` in its fallbacks and a WARNING on the answer span. (An earlier 12,000 budget from the RAG branch had not reached `main`; this puts it there, with the shared budget and the marker.)
-- **Lookups are enforced by code:** a policy question, or a plan whose `lookups_needed` names a policy, rule, document or similar, always gets a `search_documents` call; if the model never searched, code runs one with the user's own words (`forced_document_search`). A first question with no conversation and no facts cannot skip lookups even if classify said `requires_tools: false` (`requires_tools_forced_first_turn`).
+- **Lookups are enforced by code:** a policy question, or a plan whose `lookups_needed` names a policy, rule, document or similar, always gets a `search_documents` call; if the model never searched, code runs one with the user's own words (`forced_document_search`). A first question with no conversation and no facts cannot skip lookups even if classify said `requires_tools: false` (`requires_tools_forced_first_turn`). A turn that mentions a *freeze* (message or constraints) forces one search for the freeze memo per conversation (`freeze_memo_lookup_forced`), so the constraint is grounded instead of being a label. A planner subject such as "unspecified" or "[user's name not provided]" means the caller. Brackets in an answer that are not a source from this turn's evidence or facts are removed (`citations_dropped` on the answer span).
 - **A failing tool no longer discards the turn:** the first failure is recorded as an `ERROR:` row in the evidence so the answer can say it could not look that up (`tool_failed:<tool>`); a second failure makes the turn `failed`. The helper IT-KB search for access requests can no longer fail a turn.
 - Not changed: classify can still decide mid-conversation that no lookup is needed; the replays (issue #22) measure how often that is wrong. Verified offline by 119 pytest tests; not yet re-measured live.
 
