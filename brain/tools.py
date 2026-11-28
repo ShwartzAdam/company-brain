@@ -3,7 +3,7 @@ All writes go through release_write(), the only place a write is committed."""
 import contextvars
 import difflib
 
-from brain import db, gate, people, retrieval
+from brain import config, db, gate, people, retrieval
 
 # (request_id, trace_id) of the client call being served: set by the MCP server wrapper, stored on every write
 # so a database row can be followed back to the trace that caused it. Empty when called directly (tests).
@@ -54,9 +54,13 @@ def check_software_subscription(software: str) -> list[dict]:
         "JOIN systems sys ON sub.system_id = sys.system_id JOIN vendors v ON sub.vendor_id = v.vendor_id "
         "WHERE lower(sys.system_name) LIKE lower(?) OR lower(v.vendor_name) LIKE lower(?) "
         "ORDER BY sys.system_name", (like, like))
-    for s in out:
+    order = ["subscription_id", "system_name", "vendor_name", "contract_id", "seat_limit", "active_seats", "over_limit",
+             "annual_cost", "above_q3_threshold", "seats_available", "status", "renewal_date"]
+    for s in out:  # comparisons are made here, in code; the model is handed the answer (short rows: facts keep 240 characters)
         s["seats_available"] = s["seat_limit"] - s["active_seats"]
         s["over_limit"] = s["active_seats"] > s["seat_limit"]
+        s["above_q3_threshold"] = (s["annual_cost"] or 0) > config.Q3_APPROVAL_THRESHOLD
+    out = [{k: s[k] for k in order} for s in out]
     return _cite(out, "software_subscriptions", "subscription_id")
 
 

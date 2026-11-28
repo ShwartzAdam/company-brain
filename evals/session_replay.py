@@ -9,6 +9,7 @@ with an earlier file; a turn that passed before and fails now is a regression (e
 """
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -23,6 +24,9 @@ RESULTS = Path(__file__).resolve().parent / "results"
 CALLERS = {"S1-quick-policy": ("E010", "UG_REGULAR"), "S3-intent-shift": ("E007", "UG_IT"),
            "S4-constraint-carry": ("E006", "UG_IT"), "S6-boundary-clean": ("E004", "UG_HR"),
            "S7-boundary-noisy": ("E004", "UG_HR"), "S8-boundary-heavy-noise": ("E004", "UG_HR")}
+
+
+EXTRA = json.loads((Path(__file__).resolve().parent / "extra_expectations.json").read_text())
 
 
 def has(text: str, spec: str) -> bool:
@@ -54,6 +58,7 @@ def check_args(t: dict, calls: list) -> list:
 def check_turn(t: dict, answer: str, tools: list, sources: list, calls: list | None = None) -> list:
     """Binding fields only. Returns a list of failure strings (empty = pass)."""
     fails = check_args(t, calls or [])
+    fails += [f"wrong-answer pattern {rx!r}" for rx in t.get("forbidden_regex") or [] if re.search(rx, answer, re.I)]
     if t.get("should_use_tools") is not None and bool(tools) != t["should_use_tools"]:
         fails.append(f"tool use {bool(tools)} != {t['should_use_tools']}")
     fails += [f"missing fact {f!r}" for f in t.get("required_facts") or [] if not has(answer, f)]
@@ -83,6 +88,7 @@ def run_session(s: dict, run: int, ck: Path, handle_turn, after_turn=None) -> di
     group = s.get("caller_group") or CALLERS[s["id"]][1]
     out = {}
     for t in s["turns"]:
+        t = {**t, **(EXTRA.get(s["id"]) or {}).get(str(t["n"]), {})}  # our extra wrong-answer checks
         r = handle_turn(caller, group, f"{s['id']}#{run}", t["user"], AS_OF, checkpoint_path=ck,
                         case_id=s["id"], turn=t["n"])
         fails = check_turn(t, r.answer, r.tool_sequence, r.sources, r.extra.get("tool_calls"))
