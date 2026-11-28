@@ -7,7 +7,7 @@
   {"id": "W-I-02", "caller": "E018", "group": "UG_REGULAR", "message": "Which of my team members has a Webex seat?",
    "expected_intent": "team_question", "expected_tools": ["seat_assignment_status"], "optional_tools": ["get_employee", "list_direct_reports", "check_software_subscription"],
    "forbidden_tools": ["create_ticket", "create_access_request", "request_approval", "release_access", "record_consent"],
-   "required_facts": ["not recorded|no record|does not record|doesn't record|do not record|cannot tell|not tracked", "AR001|Rachel", "OT005|Maya"],
+   "required_facts": ["not recorded|no record|does not record|doesn't record|do not record|cannot tell|not tracked|seat recorded|assignments are recorded|only holds seat counts|only records seat counts|only seat counts", "AR001|Rachel", "OT005|Maya"],
    "rows_unchanged": true},
   {"id": "W-I-03", "caller": "E010", "group": "UG_REGULAR", "message": "I joined Customer Success and need Webex access. Webex says my account is not licensed.",
    "expected_intent": "access_request", "expected_tools": ["check_software_subscription"], "optional_tools": ["get_employee", "list_employee_tickets", "read_approval", "list_access_requests", "search_documents", "get_contract"],

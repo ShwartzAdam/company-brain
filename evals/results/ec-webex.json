@@ -1,0 +1,1056 @@
+{
+ "S4-constraint-carry": {
+  "1": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "4e097444024b4f8b124eacd282a0655c"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "3f0af9765b5dd3eeb4c13e0a5e47c2cc"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "be8f3def577a22cd2abc891870362f96"
+    }
+   ],
+   "fails": [
+    "tool use True != False"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "bbb73b1252da9583ec04b2c7687953b9"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "2803dd9718d2f940853ed1f43b511c3a"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "4abf8ed5264a9ab7b464c1a83618298d"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "d71d73358b082852ede41c9bd923993f"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "ec341fd7e8222f8e3f89fc75b7771e55"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "af848f5b7d76e94d54332ad54cda1c3b"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "2ac49a17594d9968c9034186bd72d650"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "e09c99729b5c54c5b4491b8c01cd39ea"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "3447009b470db4f772684a3c748d20be"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "5": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "93fc13c9faf658a5d0e4d2ca41d08d47"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "06f31a590e6bcac26337fb5b2d3bfd64"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "b2a68b2f2f936ae50641edd3bdb4bcea"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "c99cfaba82f4f5e50a0f9752b6b988f6"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "bbd0c9c3b241ff530c23df0ecc8316c6"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "0f91cfae255f9a85f51e5160286322bc"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "7": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "f2eb6df0b8993c4be596ef24094b928b"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "9d36ee390aae59526ff0a1970e9ac602"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "0bdc358699fa5bc6e4f54718451b905f"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "9db3f4619a7056af7ebfb516b443a50e"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.5,
+      "tool_selection": 0.0
+     },
+     "trace_id": "e7b8ca768f8846d8219b9a2885530919"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "8590be3786e2fc6c0cfbeee91ce86301"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "9": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "4d172cdb9fca1113fcac025c22ab9a04"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "3bd5cec8ba98ebf96b1e251c2462877a"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "6bc22d82029410255dc3ea7db6cb2dcd"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S6-boundary-clean": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "da59a2139751817654f3438558047ce1"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "6a15d1f5c8fc0fbc03886de55454fac0"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "fe23653fef9ec2fd2430cb3967978902"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "1796b2a473c4bbdfbceb823ec9e9535f"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "0d505738d756766e3e9e487a0d7c317f"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "8b86748a7dc85ec712bd3fc9e22b74ae"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "f1ea1363e8d528e9dbce8946219dc4ae"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "6dff5744d99074c11189a333afcaebcd"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "04161ad7898bd8d4e62ca61507f2892c"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": []
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "ea1e2df0642a052f42bfb13314c0f2bc"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.25,
+      "tool_selection": 0.0
+     },
+     "trace_id": "64e488155e92e6a6c8b257d48368a5b9"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "7a73e5917cd2f1b8322eb4ecb264a090"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "list_access_requests",
+    "search_documents"
+   ]
+  }
+ },
+ "S7-boundary-noisy": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "738d61734a74a30e88edc265b7ff5c1e"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "ded645271fe971e708f46cea8cc2c177"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "e5827c00e69dc8e04475925c7b81f787"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "bf01732894124397d424db131b31ed82"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "6b581e7f6717c7c7d2b08ed5dcfa67d8"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "88ce244fdd689c690bdf1680605ce34b"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "0ba0022487c26d93d9cacf67a290ddc4"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "8a18d7ae7695033dbae96be5c55e4a97"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "c36817b346d4236a924b5329b3edcbaa"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "1a5664754cdb09b4b5e95113305c06a4"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "6dd9715b471ffbac109ea9590ac35b4d"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "2b210630e825bc3e3c78151a46b3258e"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  }
+ },
+ "S8-boundary-heavy-noise": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "c2dac65aebf2a655b79160d31af32842"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "5898168a79d563a1fb5b03b0242cedf9"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "10ef660ea80446ab001977163cd25394"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "70aad367d89aa6c4e405c8c1e7e179b4"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "0724a2e2f24bb38a7096bb70d8ee448e"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "5c3ce1efa767c262152af2aafdc2613a"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "1d310d077c2d21a354650b72406d6783"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "9516443bc1be8e42420b3df03184709b"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 0.0
+     },
+     "trace_id": "3117b02fd909da99d6e18ba175cbaeb6"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "b17c65c95a44c5590a5403199ecb2632"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.5,
+      "tool_selection": 0.0
+     },
+     "trace_id": "8ac75a3e937de9d2564893bff6482f57"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.3333333333333333,
+      "tool_selection": 0.0
+     },
+     "trace_id": "52b9a2c67e583f4b011cf0e40a7877f4"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "status": "pending",
+   "tools": [
+    "list_access_requests",
+    "search_documents"
+   ]
+  }
+ },
+ "W-I-01": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "39d0047e6b85be53d1798b24b2d193db"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "5c489cc93c581d4c2114dd1b7613cf10"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "db4403651c86d1b56f131db377e9d1ec"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:employees/E010",
+    "db:tickets/T001"
+   ],
+   "status": "completed",
+   "tools": [
+    "get_employee",
+    "list_employee_tickets"
+   ]
+  }
+ },
+ "W-I-02": {
+  "1": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "e1e738e8ef35b6f55040ae4a4ba6e773"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "68a016a7bcaec4ab06971ef90c60e9c1"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "df79c0351454ecd5e13e85143f4acdb9"
+    }
+   ],
+   "fails": [
+    "missing fact \"not recorded|no record|does not record|doesn't record|do not record|cannot tell|not tracked\""
+   ],
+   "passes": 0,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:access_requests/AR001",
+    "db:employees/E001",
+    "db:employees/E003",
+    "db:employees/E010",
+    "db:onboarding_tasks/OT005",
+    "db:software_subscriptions/SUB001"
+   ],
+   "status": "completed",
+   "tools": [
+    "list_direct_reports",
+    "seat_assignment_status"
+   ]
+  }
+ },
+ "W-I-03": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "judge_overstates": 0.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "0ecaa312bcfcb97bdd0086bc252940df"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "judge_overstates": 0.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "9ceb8e02931bb3d92e1fc837f697bd59"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "judge_overstates": 0.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "3a33f2e15b06915011bdb03f26c87572"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "judge_overstates": 0.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:access_requests/AR001",
+    "db:approvals/AP001",
+    "db:approvals/AP002",
+    "db:employees/E010",
+    "db:software_subscriptions/SUB001",
+    "db:tickets/T001",
+    "documents/employment/rachel_stein_customer_success_access_profile.md",
+    "documents/internal_memos/webex_license_cleanup_memo.md",
+    "documents/it_kb/webex_license_assignment.md",
+    "documents/it_kb/webex_login_issue.md",
+    "documents/policies/onboarding_policy.md"
+   ],
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "check_software_subscription",
+    "search_documents"
+   ]
+  }
+ }
+}
