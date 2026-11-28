@@ -587,3 +587,29 @@ def test_structured_still_gives_up_after_its_retries():
             llm.structured([{"role": "user", "content": "x"}], "s", {"type": "object"}, name="classify")
     finally:
         llm.set_backend(None)
+
+
+# ---- batch A (eval-current findings) ----
+def test_guard_keeps_honest_negations_and_still_catches_claims():
+    ok = ("Escalation to the IT Manager is needed for admin access [documents/it_kb/vpn_access.md]. "
+          "No access request has been filed yet, and you have instructed not to file any until you say so.")
+    assert status.answer_agrees("pending", ok) and not status.claims_done(ok)
+    assert status.answer_agrees("completed", "No access request has been filed or granted, and the rule remains in force.")
+    assert status.claims_done("Done. The access request has been filed. I will follow up.") == ["The access request has been filed."]
+    assert not status.answer_agrees("pending", "Rachel's access is now granted.")
+
+
+def test_guard_drops_only_the_claiming_sentence(scripted, hits, tmp_path):
+    scripted(plan("policy_question"), '{"tool":"search_documents","args":{"query":"vpn"}}', '{"done":true}',
+             "VPN needs MFA and device trust [documents/policies/byod_policy.md]. I have filed the request for you.")
+    r = turn("E004", "How do I get VPN?", "t-g1", tmp_path, "UG_HR")
+    assert "MFA and device trust" in r.answer and "I have filed" not in r.answer
+
+
+def test_answer_prompt_has_today_the_request_subject_and_the_freeze_meaning(scripted, hits, tmp_path):  # first turn: a lookup is forced
+    from brain.graph import ANSWER_SYSTEM
+    assert "Finance approval above the threshold" in ANSWER_SYSTEM
+    b = scripted(plan("other", False, subject_name="Rachel Stein", system_name="Webex"), '{"tool":"search_documents","args":{"query":"webex"}}', '{"done":true}', "Draft: she needs Webex.")
+    turn("E004", "Draft one sentence on why she needs Webex.", "t-g2", tmp_path, "UG_HR")
+    body = next(c[0][0]["content"] for c in b.calls if c[0][0]["content"].startswith("Today:"))
+    assert body.startswith("Today: 2026-07-01") and "for Rachel Stein, system Webex" in body

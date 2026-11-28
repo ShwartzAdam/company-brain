@@ -13,7 +13,7 @@ from brain import checklist, gate, llm
 from brain.handoff import WebexHandoff, make_key
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
 from brain.scope import READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
-from brain.status import answer_agrees, final_status
+from brain.status import answer_agrees, claims_done, final_status
 from brain.webex import AccessDecision, release_pending
 
 MAX_STEPS = 6
@@ -382,7 +382,7 @@ ANSWER_SYSTEM = (
     "[documents/policies/byod_policy.md] or [db:onboarding_tasks/OT005]. Never use numbered citations like [1], and never cite a source that is not in the evidence. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
     "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
     "request to file something, say it has NOT been filed and what would be needed. If you could not look "
-    "something up, say so. At most six sentences. Terminal status of this turn: {status}.")
+    "something up, say so. A freeze or spending threshold means Finance approval above the threshold in the evidence; never say it blocks or defers purchases or provisioning unless the evidence says so. At most six sentences. Terminal status of this turn: {status}.")
 
 
 def _row_facts(evidence: list) -> list[str]:
@@ -419,7 +419,10 @@ async def answer(state: State, config) -> dict:
         if cut:
             fallbacks.append("evidence_truncated")
             get_client().update_current_span(level="WARNING", status_message=f"evidence shortened by {cut} characters")
-        body = (f"Facts: {state.get('facts')}\nConstraints: {state.get('constraints')}\n"
+        subj = ", ".join(x for x in (f"for {plan.subject_name}" if plan.subject_name else "",
+                                     f"system {plan.system_name}" if plan.system_name else "") if x)
+        body = (f"Today: {config['configurable'].get('as_of', '')[:10]}\n" + (f"This request is {subj}.\n" if subj else "") +
+                f"Facts: {state.get('facts')}\nConstraints: {state.get('constraints')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
                 f"Evidence:\n{ev_text}\n\nQuestion:\n{state['message']}")
         if state.get("handoff"):
@@ -428,10 +431,11 @@ async def answer(state: State, config) -> dict:
         text = llm.complete([{"role": "user", "content": body}], ANSWER_SYSTEM.format(status=status), max_tokens=700)
     h = state.get("handoff")
     if not answer_agrees(status, text):
-        get_client().update_current_span(level="WARNING", status_message="answer disagreed with status: rewritten by code")
-        _meta(guard_rewrote_answer=True, original_answer=text[:400])
-        text = ("I have not filed or granted anything. That would need the caller's explicit go-ahead "
-                "and the recorded approvals first.")
+        bad = claims_done(text)  # drop only the sentences that claim an action; keep the rest of the answer
+        get_client().update_current_span(level="WARNING", status_message="answer disagreed with status: offending sentences dropped by code")
+        _meta(guard_rewrote_answer=True, original_answer=text[:400], guard_dropped=bad)
+        text = " ".join(x for x in re.split(r"(?<=[.!?])\s+", text) if x not in bad).strip()
+        text = (text + " " if text else "") + "I have not filed or granted anything; that needs the recorded approvals first."
     if h and "pending" not in text.lower():  # the application, not the model, guarantees the honest outcome
         text += f" The {h['system']} access request for {h['subject_employee_id']} is pending; it is not filed, approved or in effect yet."
     dec = state.get("decision")
