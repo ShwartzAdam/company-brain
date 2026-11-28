@@ -207,12 +207,6 @@ def _rule_lines(state) -> list[str]:
     return [Rule(**r).render() for r in state.get("rules") or []]
 
 
-def _searched(ev: list) -> bool:
-    """A document search returned a result (not an ERROR or REJECTED row)."""
-    return any(e["tool"] == "search_documents" and not (isinstance(e["result"], str) and e["result"].startswith(("ERROR:", "REJECTED:")))
-               for e in ev)
-
-
 def memory_lines(state) -> list[str]:
     """Decisions and unresolved work, written by code from durable state (handoffs made, approvals still waiting), never
     from the model's prose, and recomputed each turn so a released approval stops being 'unresolved'."""
@@ -319,6 +313,17 @@ async def gather(state: State, config) -> dict:
             fallbacks.append("tool_failed:search_documents")
             log.append({"tool": "search_documents", "args": args, "failed": True})
             ev.append({"tool": "search_documents", "args": args, "result": f"ERROR: search failed ({str(e)[:200]}). Say the document could not be searched."})
+    if ("freeze_memo_lookup_forced" in fallbacks and "search_documents" in visible and not error
+            and not any("saas_renewal_freeze" in x for x in srcs)):  # the forced search may have used the planner's phrase and missed the memo
+        args = {"query": "Q3 SaaS renewal freeze approval threshold", "corpus": "internal_memos"}
+        try:
+            res = await box.call("search_documents", args)
+            log.append({"tool": "search_documents", "args": args})
+            ev.append({"tool": "search_documents", "args": args, "result": res})
+            srcs += _sources(res)
+        except Exception as e:  # noqa: BLE001  the memo lookup failing must not fail the whole turn
+            fallbacks.append("tool_failed:search_documents")
+            log.append({"tool": "search_documents", "args": args, "failed": True})
     if (plan.intent == "access_request" and plan.system_name.strip() and "search_documents" in visible and not error
             and not any("it_kb" in x for x in srcs)):  # #13: the login article is not reliably ranked; one targeted search
         args = {"query": f"{plan.system_name} license login account not licensed", "corpus": "it_kb"}
@@ -443,7 +448,7 @@ ANSWER_SYSTEM = (
     "[documents/policies/byod_policy.md] or [db:onboarding_tasks/OT005]. Never use numbered citations like [1], and never cite a source that is not in the evidence. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
     "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
     "request to file something, say it has NOT been filed and what would be needed. If you could not look "
-    "something up, say so. Flags in the rows (over_limit, annual_cost_above_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. annual_cost_above_threshold compares the WHOLE contract cost with the approval threshold; for adding seats the threshold applies to the increase (cost_per_seat times the seats added), so never say the contract total alone decides it. At most six sentences. Terminal status of this turn: {status}.")
+    "something up, say so. Flags in the rows (over_limit, annual_cost_above_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. annual_cost_above_threshold compares the WHOLE contract cost with the approval threshold; for adding seats use expansion_cost and expansion_above_threshold (computed by code from seats_to_add), never the contract total. If a seat question has no expansion_above_threshold, say how many seats are being added is needed; do not work it out yourself. Below the threshold only means the Q3 memo does not add an approval; other documents in the evidence may still require one. At most six sentences. Terminal status of this turn: {status}.")
 
 
 def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tuple[str, list]:
@@ -541,7 +546,7 @@ async def answer(state: State, config) -> dict:
     _io({"evidence_items": len(evid), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(evid)
-    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [*(FREEZE_NOTE for _ in [0] if "freeze_memo_lookup_forced" in fallbacks and _searched(evid)),
+    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [*(FREEZE_NOTE for _ in [0] if any("saas_renewal_freeze" in x for e in evid for x in _sources(e["result"]))),
                                                   *(f"{plan.intent}: {f}" for f in _row_facts(evid))]), "rules": state["rules"],
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
