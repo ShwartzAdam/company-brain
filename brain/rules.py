@@ -20,8 +20,7 @@ class Rule(BaseModel):
 
     def render(self) -> str:
         sup = f" It supersedes the older USD {self.supersedes_usd:,} threshold." if self.supersedes_usd else ""
-        return (f"{self.name} [{self.source}]: {self.applies_to} above USD {self.threshold_usd:,} need {self.needs} approval."
-                f"{sup} The memo sets an approval threshold, not a ban: it does not cover amounts below it.")
+        return f"{self.name} [{self.source}]: {self.applies_to} above USD {self.threshold_usd:,} need {self.needs} approval.{sup}"
 
 
 def extract_rules(evidence: list) -> list[dict]:

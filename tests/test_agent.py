@@ -345,7 +345,7 @@ def test_second_lookup_is_nudged_once_then_accepted(scripted, hits, tmp_path):
                  '{"tool":"check_software_subscription","args":{"software":"Webex"}}', '{"done":true}',
                  '{"tool":"search_documents","args":{"query":"Q3 threshold"}}', '{"done":true}', "ok")
     r = turn("E004", "Given the freeze, does a Webex seat need Finance?", "t-n1", tmp_path, "UG_HR")
-    assert r.tool_sequence == ["check_software_subscription", "search_documents"]
+    assert r.tool_sequence == ["check_software_subscription", "search_documents", "search_documents"]  # the fake never returns the memo: code searches memos once
     scripted(plan("subscription_review", lookups_needed=["a", "b", "c"]), '{"done":true}', '{"done":true}', '{"done":true}', "ok")
     r2 = turn("E004", "x?", "t-n2", tmp_path, "UG_HR")
     assert r2.tool_sequence == []  # nudged once, then the model's second "done" is accepted: no endless loop
@@ -635,7 +635,9 @@ def test_placeholder_subjects_mean_the_caller():
     assert not _GENERIC_SUBJECT.search("Rachel Stein")
 
 
-def test_a_mentioned_freeze_forces_one_memo_lookup(scripted, hits, tmp_path):
+def test_a_mentioned_freeze_forces_one_memo_lookup(scripted, monkeypatch, tmp_path):
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: [
+        {"source": "documents/internal_memos/saas_renewal_freeze_q3.md", "text": MEMO, "section": "s", "audience": "all", "score": 1.0}])
     scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]),
              '{"tool":"search_documents","args":{"query":"Q3 freeze"}}', '{"done":true}', "ok")
     r = turn("E004", "Maya starts 2026-08-01 and the Q3 SaaS freeze applies. Pull up her record.", "t-f1", tmp_path, "UG_HR")
@@ -706,7 +708,7 @@ def test_a_rule_is_read_from_the_memo_by_code_and_rendered_exactly():
     (r,) = extract_rules(ev)
     assert r["threshold_usd"] == 7500 and r["needs"] == "Finance" and r["supersedes_usd"] == 5000
     line = Rule(**r).render()
-    assert "above USD 7,500" in line and "not a ban" in line and "saas_renewal_freeze_q3.md" in line
+    assert "above USD 7,500" in line and "not a ban" not in line and "saas_renewal_freeze_q3.md" in line
     assert extract_rules([{"tool": "x", "args": {}, "result": [{"source": "documents/policies/other.md", "text": MEMO}]}]) == []
 
 
@@ -799,7 +801,8 @@ def test_a_first_name_the_model_resolved_by_full_name_does_not_ask():
     one = {"tool": "get_employee", "args": {"query": "Daniel Levi"}, "result": [{"employee_id": "E002", "full_name": "Daniel Levi"}]}
     assert ambiguous_first_name([two]) is not None
     assert ambiguous_first_name([two, one]) is None
-    assert ambiguous_first_name([two, {**one, "args": {"query": "Sara Cohen"}}]) is not None  # someone else's lookup resolves nothing
+    sara = {"tool": "get_employee", "args": {"query": "Sara Cohen"}, "result": [{"employee_id": "E030", "full_name": "Sara Cohen"}]}
+    assert ambiguous_first_name([two, sara]) is not None  # someone else's lookup resolves nothing
 
 
 def test_clean_citations_keeps_every_real_source_shape():
@@ -822,3 +825,37 @@ def test_rule_extraction_survives_a_reworded_memo_and_ignores_a_different_one():
     assert r["threshold_usd"] == 7500 and r["needs"] == "Finance" and r["supersedes_usd"] == 5000
     other = [{"tool": "search_documents", "args": {}, "result": [{"source": src, "text": "The freeze lasts until September."}]}]
     assert extract_rules(other) == []  # no threshold sentence, no rule: nothing is invented
+
+
+# ---- review #2, #7 ----
+def test_forced_freeze_lookup_reads_the_memo_even_when_the_search_phrase_missed_it(scripted, monkeypatch, tmp_path):
+    offer = {"source": "documents/employment/offer_letters/maya.md", "text": "Offer letter.", "section": "s", "audience": "all", "score": 1.0}
+    memo = {"source": "documents/internal_memos/saas_renewal_freeze_q3.md", "text": MEMO, "section": "s", "audience": "all", "score": 1.0}
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: [memo] if corpus == "internal_memos" else [offer])
+    scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]),
+             '{"tool":"search_documents","args":{"query":"Maya Cohen offer letter"}}', '{"done":true}', "ok")
+    r = turn("E004", "Maya starts 2026-08-01 and the Q3 SaaS freeze applies. Pull up her offer letter.", "t-f3", tmp_path, "UG_HR")
+    assert r.tool_sequence.count("search_documents") == 2  # the planner's phrase, then the memo by code
+    scripted(plan("onboarding_status", False), "recalled")
+    assert turn("E004", "Remind me what freeze I mentioned.", "t-f3", tmp_path, "UG_HR").tool_sequence == []
+
+
+def test_a_freeze_search_that_never_returned_the_memo_is_tried_again(scripted, monkeypatch, tmp_path):
+    offer = {"source": "documents/employment/offer_letters/maya.md", "text": "Offer letter.", "section": "s", "audience": "all", "score": 1.0}
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: [offer])
+    scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]),
+             '{"tool":"search_documents","args":{"query":"Maya Cohen offer letter"}}', '{"done":true}', "ok")
+    turn("E004", "Maya starts 2026-08-01 and the Q3 SaaS freeze applies. Pull up her offer letter.", "t-f4", tmp_path, "UG_HR")
+    scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]), '{"done":true}', "ok")
+    r2 = turn("E004", "And does the freeze change anything?", "t-f4", tmp_path, "UG_HR")
+    assert "freeze_memo_lookup_forced" in r2.extra["fallbacks"]  # no FREEZE_NOTE was recorded for a search that missed the memo
+
+
+def test_seat_expansion_is_priced_against_the_threshold_by_code():
+    from brain import tools
+    plain = tools.check_software_subscription("Webex")[0]
+    assert "expansion_above_threshold" not in plain
+    two = tools.check_software_subscription("Webex", seats_to_add=2)[0]
+    assert two["expansion_cost"] == round(plain["annual_cost"] / plain["seat_limit"] * 2, 2) and two["expansion_above_threshold"] is False
+    many = -(-7501 * plain["seat_limit"] // plain["annual_cost"])  # smallest seat count whose cost passes USD 7,500
+    assert tools.check_software_subscription("Webex", seats_to_add=many)[0]["expansion_above_threshold"] is True

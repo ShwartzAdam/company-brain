@@ -45,8 +45,9 @@ def list_direct_reports(manager_id: str) -> list[dict]:
     return _cite(db.rows("SELECT employee_id, full_name, role, status FROM employees "
                    "WHERE manager_id = ? ORDER BY full_name", (manager_id,)), "employees", "employee_id")
 
-def check_software_subscription(software: str) -> list[dict]:
-    """Seat limit, ACTIVE seats, over-limit flag, annual cost and renewal date for a software/vendor name."""
+def check_software_subscription(software: str, seats_to_add: int | None = None) -> list[dict]:
+    """Seat limit, ACTIVE seats, over-limit flag, annual cost and renewal date for a software/vendor name.
+    Pass seats_to_add when the question is about adding seats: code then prices the expansion against the approval threshold."""
     like = f"%{software}%"
     out = db.rows(
         "SELECT sub.subscription_id, sys.system_name, v.vendor_name, sub.contract_id, sub.seat_limit, "
@@ -55,14 +56,19 @@ def check_software_subscription(software: str) -> list[dict]:
         "WHERE lower(sys.system_name) LIKE lower(?) OR lower(v.vendor_name) LIKE lower(?) "
         "ORDER BY sys.system_name", (like, like))
     order = ["subscription_id", "system_name", "vendor_name", "contract_id", "seat_limit", "active_seats", "over_limit",
-             "annual_cost", "annual_cost_above_threshold", "cost_per_seat", "seats_available", "status", "renewal_date"]
+             "annual_cost", "annual_cost_above_threshold", "cost_per_seat", "seats_available", "status", "renewal_date"] + (["seats_to_add", "expansion_cost", "expansion_above_threshold"] if seats_to_add else [])
     for s in out:  # comparisons are made here, in code; the model is handed the answer (short rows: facts keep 240 characters)
         s["seats_available"] = s["seat_limit"] - s["active_seats"]
         s["over_limit"] = s["active_seats"] > s["seat_limit"]
         # the WHOLE contract cost against the threshold (a question about what a subscription costs). The memo applies the threshold
-        # to an expansion's increase, so a question about adding seats uses cost_per_seat x seats added (KNOWN-TRAPS B2).
+        # to an expansion's increase, so adding seats is priced here as cost_per_seat x seats_to_add (KNOWN-TRAPS B2).
+        # ponytail: per-seat price is annual_cost / seat_limit; use the contract's unit price if the data ever carries one.
         s["annual_cost_above_threshold"] = (s["annual_cost"] or 0) > config.Q3_APPROVAL_THRESHOLD
         s["cost_per_seat"] = round((s["annual_cost"] or 0) / s["seat_limit"], 2) if s["seat_limit"] else None
+        if seats_to_add:
+            s["seats_to_add"] = seats_to_add
+            s["expansion_cost"] = round((s["annual_cost"] or 0) / s["seat_limit"] * seats_to_add, 2) if s["seat_limit"] else None
+            s["expansion_above_threshold"] = None if s["expansion_cost"] is None else s["expansion_cost"] > config.Q3_APPROVAL_THRESHOLD
     out = [{k: s[k] for k in order} for s in out]
     return _cite(out, "software_subscriptions", "subscription_id")
 
