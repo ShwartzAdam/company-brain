@@ -181,6 +181,13 @@ def _evidence(ev: list) -> tuple[str, int]:
     return "\n".join(lines) or "(none yet)", cut
 
 
+def live_evidence(ev: list) -> list:
+    """A failed or rejected call is dropped once a later call of the same tool returned a result: the answer must not
+    say 'could not look it up' about something the retry found."""
+    bad = lambda e: isinstance(e["result"], str) and e["result"].startswith(("ERROR:", "REJECTED:"))  # noqa: E731
+    return [e for i, e in enumerate(ev) if not (bad(e) and any(x["tool"] == e["tool"] and not bad(x) for x in ev[i + 1:]))]
+
+
 def _evidence_text(ev: list) -> str:
     return _evidence(ev)[0]
 
@@ -429,6 +436,7 @@ def _row_facts(evidence: list) -> list[str]:
 @_node("answer")
 async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
+    evid = live_evidence(state["evidence"])
     fallbacks = list(state.get("fallbacks") or [])
     status = final_status(error=bool(state["error"]), clarify=plan.intent == "ambiguous", refuse=plan.refuse,
                           action_unreleased=plan.intent == "access_request")
@@ -437,7 +445,7 @@ async def answer(state: State, config) -> dict:
     elif status == "failed":
         text = f"I could not complete this: {state['error']}."
     else:
-        ev_text, cut = _evidence(state["evidence"])
+        ev_text, cut = _evidence(evid)
         if cut:
             fallbacks.append("evidence_truncated")
             get_client().update_current_span(level="WARNING", status_message=f"evidence shortened by {cut} characters")
@@ -453,9 +461,9 @@ async def answer(state: State, config) -> dict:
         text = llm.complete([{"role": "user", "content": body}], ANSWER_SYSTEM.format(status=status), max_tokens=700)
     if plan.intent != "ambiguous" and status != "failed":
         allowed = set(state.get("sources") or []) | set(re.findall(r"\[((?:db:|documents/)[^\]]+)\]", " ".join(state.get("facts") or [])))
-        allowed |= {str(p.get("source")) for e in state["evidence"] for p in (e["result"] if isinstance(e["result"], list) else [])
+        allowed |= {str(p.get("source")) for e in evid for p in (e["result"] if isinstance(e["result"], list) else [])
                     if isinstance(p, dict)}
-        numbered = {str(i): list(dict.fromkeys(_sources(e["result"])))[:3] for i, e in enumerate(state["evidence"], 1)}
+        numbered = {str(i): list(dict.fromkeys(_sources(e["result"])))[:3] for i, e in enumerate(evid, 1)}
         text, dropped = clean_citations(text, allowed, numbered)
         if dropped:
             _meta(citations_dropped=dropped)
@@ -473,10 +481,10 @@ async def answer(state: State, config) -> dict:
         d = AccessDecision(**dec)
         status = d.status
         text += " " + d.render()
-    _io({"evidence_items": len(state["evidence"]), "handoff": bool(h)}, {"answer": text[:400], "status": status})
+    _io({"evidence_items": len(evid), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
-    cl = checklist.build(state["evidence"])
-    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(state["evidence"])]),
+    cl = checklist.build(evid)
+    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(evid)]),
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 

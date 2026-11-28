@@ -1,0 +1,245 @@
+[
+ {
+  "item": "M-I-01",
+  "turn": null,
+  "thread": "rehearsal-M-I-01",
+  "trace_id": "5b56453c6e17cf3bbaaacc2aa4739b6c",
+  "status": "completed",
+  "request_id": "rehearsal-M-I-01:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-I-02",
+  "turn": null,
+  "thread": "rehearsal-M-I-02",
+  "trace_id": "b1335253c974669b1ca4eb26d7c199d2",
+  "status": "completed",
+  "request_id": "rehearsal-M-I-02:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-I-03",
+  "turn": null,
+  "thread": "rehearsal-M-I-03",
+  "trace_id": "7faf24ea157c37651dc1306e2aefe9f9",
+  "status": "completed",
+  "request_id": "rehearsal-M-I-03:1",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 1,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "868ba3c1d66ca7c6ce655fc7c74c5830",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:1",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 2,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "0d55c321836b9f5dcfa0077e6be158c8",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:2",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 3,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "132f8e1b4194917357fac94e861dbaf1",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:3",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 4,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "176aa2372ddd534d30c4a44c4df44784",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:4",
+  "intent": "ticket_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 5,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "18be5a8f26268cbcb2bdc3257b2a2db4",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:5",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 6,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "e1cc030ed82013ef7cac20aff8bbb8f1",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:6",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 7,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "ee30eb28629127fb80ef09e00fede6ea",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:7",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 8,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "410fd5b289515688f95faaa456158547",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:8",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 9,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "9f65ea806231e112acf22da76dc4ca8c",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:9",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 10,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "4cb3a9b3dd08b94c422c144709b993f3",
+  "status": "pending",
+  "request_id": "rehearsal-M-S-01:10",
+  "intent": "access_request"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 11,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "916657004127bd27640c114e98f9e857",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:11",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-01",
+  "turn": 12,
+  "thread": "rehearsal-M-S-01",
+  "trace_id": "33b77e4f88f9e0fb405f116c4941c2cf",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-01:12",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 1,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "74dab768e6f90b5fc63f35e89b73bda1",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 2,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "6a6e123f5542d167884e61fa6c44dbe7",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:2",
+  "intent": "other"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 3,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "da9c2af9264c56943202632804da9f60",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:3",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 4,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "ce591aa51c0c07db0fb17572b6b3ed3b",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:4",
+  "intent": "policy_question"
+ },
+ {
+  "item": "M-S-02",
+  "turn": 5,
+  "thread": "rehearsal-M-S-02",
+  "trace_id": "f1cdbec4fdcab7b06d5e69244139a6a6",
+  "status": "completed",
+  "request_id": "rehearsal-M-S-02:5",
+  "intent": "onboarding_status"
+ },
+ {
+  "item": "W-I-01",
+  "turn": null,
+  "thread": "rehearsal-W-I-01",
+  "trace_id": "9f696bb6f9f907315ebdbd4e44a817a3",
+  "status": "completed",
+  "request_id": "rehearsal-W-I-01:1",
+  "intent": "ticket_status"
+ },
+ {
+  "item": "W-I-02",
+  "turn": null,
+  "thread": "rehearsal-W-I-02",
+  "trace_id": "dd1a0032d3fd0f8027ab1a835e478d98",
+  "status": "completed",
+  "request_id": "rehearsal-W-I-02:1",
+  "intent": "team_question"
+ },
+ {
+  "item": "W-I-03",
+  "turn": null,
+  "thread": "rehearsal-W-I-03",
+  "trace_id": "dc5178f8d4d03ba92b0b1878063630b4",
+  "status": "pending",
+  "request_id": "rehearsal-W-I-03:1",
+  "intent": "access_request"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 1,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "bdb9ea3040580c49834c7202630df4bd",
+  "status": "completed",
+  "request_id": "rehearsal-W-S-01:1",
+  "intent": "policy_question"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 2,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "cd5c244d20db9cdf772ff8e21a388007",
+  "status": "completed",
+  "request_id": "rehearsal-W-S-01:2",
+  "intent": "employee_lookup"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 3,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "104c7a1ae3460df071129277493626ed",
+  "status": "pending",
+  "request_id": "rehearsal-W-S-01:3",
+  "intent": "access_request"
+ },
+ {
+  "item": "W-S-01",
+  "turn": 4,
+  "thread": "rehearsal-W-S-01",
+  "trace_id": "541d40defa6bf1c613cc49f0b574028c",
+  "status": "pending",
+  "request_id": "rehearsal-W-S-01:4",
+  "intent": "access_request"
+ }
+]

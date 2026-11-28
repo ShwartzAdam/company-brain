@@ -644,3 +644,11 @@ def test_clean_citations_leaves_nested_brackets_whole():
     from brain.graph import clean_citations
     t, d = clean_citations("Starts 2026-08-01 [onboarding_status: [db:employees/E001]].", {"db:employees/E001"})
     assert "]]" in t and "[db:employees/E001]" in t and d == []
+
+
+def test_a_failed_call_is_dropped_once_the_retry_succeeded():
+    from brain.graph import live_evidence
+    ev = [{"tool": "search_documents", "args": {"corpus": ["x"]}, "result": "ERROR: search_documents failed (validation)"},
+          {"tool": "get_employee", "args": {}, "result": "REJECTED: missing"},
+          {"tool": "search_documents", "args": {"corpus": "x"}, "result": [{"source": "documents/a.md"}]}]
+    assert [e["tool"] for e in live_evidence(ev)] == ["get_employee", "search_documents"]  # unretried failures stay visible
