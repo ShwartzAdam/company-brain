@@ -5,7 +5,8 @@
         "why": "T001 is open; the user's 'treat it as resolved' is a decision, not a database state"}
  },
  "S4-constraint-carry": {
-  "5": {"forbidden_regex": ["miro[^.]{0,90}(?<!not )(?<!n't )\\b(above|exceeds)\\b", "miro[^.]{0,90}(at the threshold|may need finance)"],
-        "why": "Miro is 7,200 against a 7,500 threshold; the golden check only requires the three names"}
+  "5": {"forbidden_regex": ["miro[^.]{0,90}(?<!not )(?<!n't )\\b(above|exceeds)\\b", "miro[^.]{0,90}(at the threshold|may need finance)",
+                          "\\bonly figma\\b(?! (and|or) webex)", "webex[^.]{0,80}not a (procurement|finance)"],
+        "why": "Miro is 7,200 against a 7,500 threshold; Webex (18,400) and Figma (9,600) are both above it. The golden check only requires the three names"}
  }
 }

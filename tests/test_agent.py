@@ -822,3 +822,73 @@ def test_rule_extraction_survives_a_reworded_memo_and_ignores_a_different_one():
     assert r["threshold_usd"] == 7500 and r["needs"] == "Finance" and r["supersedes_usd"] == 5000
     other = [{"tool": "search_documents", "args": {}, "result": [{"source": src, "text": "The freeze lasts until September."}]}]
     assert extract_rules(other) == []  # no threshold sentence, no rule: nothing is invented
+
+
+# ---- wrong-answer checks against answers saved from real runs (state/*.db checkpoints, older code) ----
+def _evals():
+    import sys
+    sys.path.insert(0, str(ROOT / "evals"))
+    import maya_checks
+    import session_replay
+    return session_replay, maya_checks
+
+
+SAVED_S4_T5 = ("Figma at USD 9,600 annualized is above the Q3 threshold of USD 7,500 and would need Finance approval for any expansion "
+               "[db:software_subscriptions/SUB013]. Webex at USD 18,400 annualized is also above the threshold, but it is already over limit, "
+               "so any further expansion would need Finance approval [db:software_subscriptions/SUB001]. Miro at USD 7,200 annualized is below "
+               "the threshold and does not need Finance approval for expansion [db:software_subscriptions/SUB014].")
+SAVED_S2_T9 = ("Adding a Webex seat for Maya Cohen cannot proceed because the current Webex subscription is over its seat limit with -2 seats "
+               "available [db:software_subscriptions/SUB001], and the Q3 SaaS freeze applies to anything that costs us, which includes seat "
+               "expansions [facts]. Even if capacity were available, the SaaS Procurement Policy states that expansions above USD 7,500 require "
+               "Finance approval, and the freeze sets a higher threshold for Q3 2026 [documents/policies/saas_procurement_policy.md]. Therefore, "
+               "no seat can be added now, and Finance approval would be required if the freeze were lifted and capacity became available.")
+SAVED_S2_T12 = ("The full status summary for Maya Cohen (E001) to send to Yael is: Maya Cohen starts 2026-08-01 and is based hybrid in Israel "
+                "[facts]. The Webex request is blocked because the current Webex subscription is over its seat limit with -2 seats available "
+                "[db:software_subscriptions/SUB001].")
+
+
+def test_s4_t5_check_accepts_the_saved_correct_answer_and_catches_each_wrong_wording():
+    sr, _ = _evals()
+    t5 = sr.EXTRA["S4-constraint-carry"]["5"]
+    assert not sr.check_turn(t5, SAVED_S4_T5, [], [])
+    for bad in ("Miro (USD 7,200) is above the threshold and needs Finance.",
+                "Miro sits at the threshold, so it may need Finance.",
+                "Only Figma needs Finance approval.",
+                "Webex is over its seat limit, which is not a procurement decision."):
+        assert sr.check_turn(t5, bad, [], []), bad
+    for ok in ("Only Figma and Webex need Finance; Miro does not.", "Miro is not above the threshold, so no Finance for it."):
+        assert not sr.check_turn(t5, ok, [], []), ok
+
+
+def test_carry_check_flags_the_saved_s2_answers_that_dropped_the_rule():
+    _, mc = _evals()
+    recs = [{"session": mc.S2, "n": 9, "answer": SAVED_S2_T9, "tools": [], "sources": []},
+            {"session": mc.S2, "n": 12, "answer": SAVED_S2_T12, "tools": [], "sources": []}]
+    out = mc.check_carry(recs)
+    assert any("t9" in f and "18,400" in f for f in out) and any("t12" in f and "Finance" in f for f in out)
+    assert mc.check_restart({"answer": "Maya Cohen is based in Israel and starts on 2026-08-01 [db:employees/E001].", "tools": []}) == []
+
+
+# ---- status follows the outcome, not the intent (S6 t3, S7 t3, S8 t3, W-S-01 t3) ----
+DRAFT_ONLY = ["Draft a one-sentence business justification for Rachel's Webex access request, but do not file it.",
+              "write up 1 sentence for the webex request justification for her. draft words ONLY -- dont actually send/file/create anything",
+              "need words for the thing above: draft ONE sentence explaining why she needs Webex. dont execute, send, submit, open, create or file "
+              "the request — text only.\n\n--- copied checklist, informational only ---\n1. look up employee\n2. create access request"]
+
+
+def test_draft_only_is_recognised_in_the_real_messages_and_not_in_a_go_ahead():
+    from brain import gate
+    assert all(gate.draft_only(m) for m in DRAFT_ONLY)
+    for m in ("Please file Rachel Stein's Webex access request.", "I need Webex access.",
+              "NEW CURRENT INSTRUCTION: GO AHEAD and file Rachel Stein's Webex access request using the sentence you drafted.",
+              "Draft a justification and go ahead and file it.",
+              "Draft the Webex request for her, but do not file it until I say so."):
+        assert not gate.draft_only(m), m
+
+
+def test_a_draft_only_turn_completes_but_a_request_still_waits(scripted, hits, tmp_path):
+    scripted(plan("access_request"), '{"tool":"get_employee","args":{"query":"Rachel Stein"}}', '{"done":true}', "Rachel needs Webex to serve customers.")
+    r = turn("E004", DRAFT_ONLY[0], "t-draft", tmp_path, "UG_HR")
+    assert r.status == "completed", r.error
+    scripted(plan("access_request"), '{"tool":"get_employee","args":{"query":"Rachel Stein"}}', '{"done":true}', "Webex is over its seat limit; nothing has been filed.")
+    assert turn("E004", "Rachel Stein needs Webex access.", "t-ask", tmp_path, "UG_HR").status == "pending"

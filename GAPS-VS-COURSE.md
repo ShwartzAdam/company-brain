@@ -72,3 +72,10 @@ Risk to read live before trusting: the capped replies and the new classify field
 - The freeze-memo note is stored only after a document search succeeded, so a failed search is retried on the next turn.
 - A first name is no longer "ambiguous" once a later lookup by full name or id found the person.
 - `clean_citations` keeps a `#section` form of a real source; rule extraction accepts reworded memos and no longer claims more than the memo says.
+
+## I. Offline checks added after the merge of #32 (unit tests only, not measured live)
+- Status follows the outcome for draft-only turns: `gate.draft_only()` (draft words, "do not file", no `until`/`unless`, no go-ahead) ends
+  `completed` when no handoff was made and no approval is waiting. Every other access-request turn stays `pending`. Covers S6 t3, S7 t3, S8 t3, W-S-01 t3.
+- S4 t5 wrong-answer check also rejects "only Figma" and "Webex is not a procurement decision"; tested against the one correct answer saved from a real run.
+- The Maya carry check is shown to flag the real S2 t9 and t12 answers saved from an older run.
+- KNOWN-TRAPS section D maps each trap to the 27 questions. Open gaps: stale manager E003 (W-I-02) and the outdated runbook line (W-I-03).

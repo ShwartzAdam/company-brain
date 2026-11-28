@@ -61,6 +61,17 @@ def consent_from_message(message: str) -> bool:
 _BLOCK = re.compile(r"(do not|don'?t|dont|never|not)\b.{0,30}\b(file|create|submit|execute)|\bno filing\b|until i (say|write|tell)", re.I)
 
 
+_DRAFT = re.compile(r"\b(draft|write up|wording)\b", re.I)
+_DEFERRED = re.compile(r"\b(until|unless|till)\b", re.I)  # 'do not file until I say so': a filing is still expected, so the turn waits
+
+
+def draft_only(message: str) -> bool:
+    """The caller asked for words and said not to file: nothing waits afterwards, so the turn is not 'pending'.
+    Regex heuristic like the rest of this module; a go-ahead in the same message wins."""
+    t = top_level(message)
+    return bool(_DRAFT.search(t) and _BLOCK.search(t)) and not _DEFERRED.search(t) and not consent_from_message(message)
+
+
 _SELF = re.compile(r"\b(i need|i want|i'?d like|i require|please (?:get|request|give|set)|can you (?:get|request|give|set)|"
                    r"need[^.]{0,30} access)\b", re.I)
 

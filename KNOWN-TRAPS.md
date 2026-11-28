@@ -61,3 +61,30 @@ contract bodies beyond header fields.
 - Every document named in the golden datasets exists under `documents/`.
 - Database and contract documents agree on seat limit, cost, dates, renewal type and notice days
   for all 20 contracts. The only mismatches are the two owners in trap A3.
+
+## D. Which traps the 27 submission questions can reach, and what covers each (offline read, nothing run live)
+Questions are in `data/EVALUATION-INPUTS.yaml` (Maya 20, Webex 7). "Covered" means a unit test or an eval check fails if the
+behaviour breaks. It does not mean the live model gets it right; no live run has measured commits after PR #31.
+
+| Trap | Questions that can hit it | What covers it | Verdict |
+|---|---|---|---|
+| A1 Webex over limit | M-S-01 t8-t10, t12; W-I-03; W-S-01 t4 | `over_limit` computed in code; `tests/test_webex.py` reuse of `T001`/`AR001`; `check_never_granted` | covered |
+| A2 USD 7,500 threshold | M-S-01 t1, t9, t12; M-S-02 t3 | typed `Rule` read from the memo (`brain/rules.py`); carry checks S2 t9, t12, S4 t8 | covered offline, carry still failing in the last live run |
+| A3 contract owners | none of the 27 | nothing | not reachable by the 27; no check |
+| A4 restricted vs open HR docs | M-S-02 t1, t4 (caller E001 is not a manager) | audience filter at retrieval; `tests/test_retrieval.py::test_playbook_unreachable_for_non_manager...` | covered |
+| A5 duplicate names | M-S-01 (Maya Cohen vs Rosen), M-S-02 t2 (Sara), W-S-01 t1-t2 (Rachel, Sara), M-I-03 | exact-name subject resolution, `ambiguous_first_name`, `arg_checks` with `equals: E001` | covered |
+| A6 approval states | M-S-01 t10, W-I-03, W-S-01 t4 | `ap()` state asserts in `tests/test_webex.py`; handoff never grants | covered |
+| A7 stale manager (E003 under E018, should be E013) | W-I-02 (E018 asks "my team members"); `list_direct_reports(E018)` returns Noam Sharon from the database as supplied | only `seat_assignment_status` leaves E003 out | **gap**: no code or check handles it; an answer that lists Noam as Yael's report is not caught |
+| B1 equipment rules | M-I-03, M-S-01 t6 | golden `required_facts`; retrieval | model-dependent |
+| B2 threshold applies to the increment | M-S-01 t9 | `cost_per_seat` and `annual_cost_above_threshold` flags; answer prompt line; test | covered offline, unmeasured live |
+| B3 outdated "reconcile later" runbook line | W-I-03 (the IT KB article `webex_license_assignment.md` carries it) | nothing | **gap**: no check. A forbidden-words check would also fail an answer that correctly calls the line invalid, so it needs a sentence-level rule |
+| B4 approvers differ | M-S-01 t9-t10, W-S-01 t4 | handoff names approval ids; `request_approval` reuse | partly covered; who approves what is the model's wording |
+| B5 Maya's checklist (`OT005` blocked, `AR004` planned, `OT002` pending) | M-S-01 t3, t11, t12 | `tests/test_agent.py` and `tests/test_maya_checks.py` use `OT005`; `AR004` and the 2026-08-01 activation date appear in no test | partly covered |
+| B6 renewal deadlines | none of the 27 | nothing | not reachable; day counts shift by one at as_of 07-01 |
+| B7 authority order | M-S-02 t3 | prompt line "newer or more specific guidance overrides older" | model-dependent |
+| B8, B9 security list, other thresholds | none of the 27 | nothing | not reachable |
+| B10 seat assignments not recorded | W-I-02 | `test_seat_assignments_are_reported_as_a_gap`; W-I-02 wording test | covered |
+
+Gaps worth closing offline, smallest first: (1) a W-I-02 check that Noam Sharon is not listed as E018's report, plus a code note on
+`list_direct_reports` rows when an employment addendum names a different manager; (2) a sentence-level B3 check for W-I-03.
+Neither is done: they change what the golden-adjacent checks fail on, so they need your call.

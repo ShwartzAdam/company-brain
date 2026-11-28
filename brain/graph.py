@@ -483,8 +483,9 @@ async def answer(state: State, config) -> dict:
     rules = {r["name"]: r for r in [*(state.get("rules") or []), *extract_rules(evid)]}  # newest reading of a rule wins
     state = {**state, "rules": list(rules.values())}
     fallbacks = list(state.get("fallbacks") or [])
+    waiting = bool(state.get("handoff")) or any(not p.get("released") for p in (state.get("pending") or {}).values())
     status = final_status(error=bool(state["error"]), clarify=plan.intent == "ambiguous", refuse=plan.refuse,
-                          action_unreleased=plan.intent == "access_request")
+                          action_unreleased=plan.intent == "access_request" and (waiting or not gate.draft_only(state["message"])))
     if amb:  # a first name that matches several employees is never resolved by the model
         status = final_status(error=False, clarify=True, refuse=False, action_unreleased=False)
         text = f"Which {amb[0]} do you mean: " + " or ".join(f"{n} ({i})" for i, n in amb[1]) + "? Please give the full name or employee id."
