@@ -90,13 +90,6 @@ async def classify(state: State, config) -> dict:
         plan.requires_tools = True  # the prompt says a first question needs a lookup; code enforces it: nothing to answer from
         fallbacks.append("requires_tools_forced_first_turn")
     grounded = list(state.get("facts") or [])
-    if not plan.requires_tools and not plan.refuse and plan.intent not in ("other", "ambiguous") and state.get("messages"):
-        missing = missing_facts(plan.needed_facts, " ".join([*grounded, *(state.get("constraints") or []), *_rule_lines(state),
-                                                              *(m["content"] for m in _window(state))]))
-        if missing:  # the model said 'answerable from memory'; code checks the memory for each fact it said it needs
-            plan.requires_tools = True
-            plan.lookups_needed = [*plan.lookups_needed, *missing]
-            fallbacks.append("needed_facts_missing")
     if (_FREEZE.search(" ".join([state["message"], *(state.get("constraints") or []), *plan.relevant_constraints]))
             and not plan.refuse and plan.intent != "ambiguous" and "search_documents" in LOADOUTS.get(plan.intent, ("", ()))[1]
             and not state.get("rules") and not any("saas_renewal_freeze" in f or f == FREEZE_NOTE for f in grounded)):
@@ -199,22 +192,6 @@ def ambiguous_first_name(ev: list):
         if e["tool"] == "get_employee" and q and " " not in q and not re.fullmatch(r"E\d+|\S+@\S+", q) and len(rows) > 1:
             return q, [(r["employee_id"], r["full_name"]) for r in rows]
     return None
-
-
-_GENERIC = {"name", "person", "first", "question", "status", "details", "information", "current", "latest", "user", "what",
-            "which", "that", "this", "their", "with", "from", "have", "about", "the", "and", "for", "are", "was", "has",
-            "number", "date", "value", "list", "summary", "answer", "request", "they"}
-
-
-def missing_facts(needed: list, haystack: str) -> list:
-    """A needed fact is present when most of its specific words (not generic ones) appear in memory. Lexical, so it only
-    catches facts whose subject was never mentioned. ponytail: typed slots per fact kind if this misses too much."""
-    hay, out = haystack.lower(), []
-    for fact in needed:
-        words = [w for w in re.findall(r"[a-z0-9][a-z0-9,.\-]*[a-z0-9]|[a-z0-9]", fact.lower()) if len(w) > 2 and w not in _GENERIC]
-        if words and sum(w in hay for w in words) < 0.6 * len(words):
-            out.append(fact)
-    return out
 
 
 def _rule_lines(state) -> list[str]:

@@ -714,19 +714,3 @@ def test_the_rule_is_kept_and_shown_to_the_answer_on_later_turns(scripted, tmp_p
     turn("E004", "Remind me what I said.", "t-r1", tmp_path, "UG_HR")
     body = next(c[0][0]["content"] for c in b.calls if "Rules in force" in c[0][0]["content"])
     assert "above USD 7,500" in body and "Finance" in body
-
-
-def test_missing_facts_is_lexical_and_ignores_generic_words():
-    from brain.graph import missing_facts
-    hay = "maya cohen starts 2026-08-01 webex subscription sub001 annual_cost=18400 over_limit=true"
-    assert missing_facts(["Webex annual cost", "name of the person"], hay) == []
-    assert missing_facts(["Finance approval threshold for expansion"], hay) == ["Finance approval threshold for expansion"]
-
-
-def test_a_fact_the_memory_does_not_hold_forces_a_lookup_after_turn_one(scripted, hits, tmp_path):
-    scripted(plan("policy_question"), '{"tool":"search_documents","args":{"query":"a"}}', '{"done":true}', "one")
-    turn("E004", "How do I get VPN?", "t-n1", tmp_path, "UG_HR")
-    scripted(plan("policy_question", False, needed_facts=["Okta password rotation interval"]),
-             '{"tool":"search_documents","args":{"query":"okta"}}', '{"done":true}', "two")
-    r = turn("E004", "And how often must Okta passwords rotate?", "t-n1", tmp_path, "UG_HR")
-    assert "needed_facts_missing" in r.extra["fallbacks"] and "search_documents" in r.tool_sequence
