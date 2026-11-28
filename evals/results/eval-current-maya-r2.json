@@ -1,0 +1,23 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t12: missing 'Finance' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S4-constraint-carry t8: missing 'Finance' (turn-1 threshold still flagged when the user lifts the filing rule)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)"
+ ],
+ "closed": [
+  "S2-onboarding-maya t10: closed-branch word 'Rachel' in answer"
+ ],
+ "citations": [
+  "S2-onboarding-maya t8: tool-backed answer cites nothing"
+ ],
+ "writes": [],
+ "handoff": [],
+ "restart": [],
+ "arguments": [],
+ "faithful": [
+  "S2-onboarding-maya t8: faithfulness 0.00, unsupported ['There is no available Webex seat for Maya Cohen because the current subscription has exceeded its seat limit with 42 active seats against a limit of 40, showing -2 seats available [1]', 'Additionally, the Q3 SaaS freeze applies to anything that costs the company, which includes obtaining additional Webex licenses [2]', 'Therefore, a Webex seat cannot be provided to Maya Cohen at this time due to both seat availability and the ongoing Q3 SaaS freeze']",
+  "S9-maya-own-account t2: faithfulness 0.50, unsupported [\"Did not address user's question about promotion path for CSM\", 'Did not analyze the forwarded email to identify tasks the user needs to handle']"
+ ]
+}

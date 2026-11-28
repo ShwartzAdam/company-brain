@@ -1,0 +1,21 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t12: missing 'Finance' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)"
+ ],
+ "closed": [],
+ "citations": [
+  "S2-onboarding-maya t8: tool-backed answer cites nothing"
+ ],
+ "writes": [],
+ "handoff": [],
+ "restart": [],
+ "arguments": [],
+ "faithful": [
+  "S2-onboarding-maya t2: faithfulness 0.75, unsupported ['The onboarding summary confirms Okta, laptop, remote equipment, Salesforce, and BambooHR self-service are planned, but Webex is blocked and should not be activated before the approved preboarding window']",
+  "S2-onboarding-maya t3: faithfulness 0.70, unsupported ['BambooHR self-service profile addition is on the onboarding checklist', 'the Q3 SaaS freeze applies so any new SaaS tools must be deferred']",
+  "S2-onboarding-maya t8: faithfulness 0.00, unsupported ['There is no available Webex seat for Maya Cohen because the current subscription is over its seat limit with 42 active seats against a limit of 40', 'Additionally, the Q3 SaaS freeze applies to any new license costs, preventing a new seat request now']"
+ ]
+}
