@@ -69,6 +69,10 @@ Risk to read live before trusting: the capped replies and the new classify field
 
 ## H. Review fixes made offline (unit tests only)
 - The subscription flag is now `annual_cost_above_threshold` (whole contract) next to `cost_per_seat`; the answer prompt says an expansion is judged by its increase.
+  Updated in PR #33: with `seats_to_add`, code returns `expansion_cost` and `expansion_above_threshold`, so the model no longer multiplies or compares.
 - The freeze-memo note is stored only after a document search succeeded, so a failed search is retried on the next turn.
+  Updated in PR #33: only after the memo itself was returned (a search that found other documents no longer counts), and code searches `internal_memos` when the forced search missed it.
 - A first name is no longer "ambiguous" once a later lookup by full name or id found the person.
+  Updated in PR #33: decided by the result (exactly one of the ambiguous employees came back), not by matching the query text, which let "Dan" match "Jordan".
 - `clean_citations` keeps a `#section` form of a real source; rule extraction accepts reworded memos and no longer claims more than the memo says.
+  Updated in PR #33: the rendered rule no longer adds a "not a ban" sentence the memo does not contain.
