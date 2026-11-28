@@ -3,9 +3,11 @@ All writes go through release_write(), the only place a write is committed."""
 import contextvars
 import difflib
 
-from brain import config, db, gate, people, retrieval
+from brain import config, gate
 
 # (request_id, trace_id) of the client call being served: set by the MCP server wrapper, stored on every write
+
+from server import db, people, retrieval
 # so a database row can be followed back to the trace that caused it. Empty when called directly (tests).
 REQUEST: contextvars.ContextVar = contextvars.ContextVar("request", default=("", ""))
 

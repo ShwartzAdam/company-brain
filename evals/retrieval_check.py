@@ -12,7 +12,7 @@ from pathlib import Path
 
 from _common import GOLD
 
-from brain import opensearch, retrieval
+from server import opensearch, retrieval
 
 ap = argparse.ArgumentParser()
 ap.add_argument("mode", nargs="?", default="rerank", choices=["vector", "hybrid", "rerank"])

@@ -28,7 +28,9 @@ import session_replay as sr  # noqa: E402
 import webex_checks as wc  # noqa: E402
 import judge  # noqa: E402
 
-from brain import agent, config, db, gate  # noqa: E402
+from brain import agent, config, gate  # noqa: E402
+
+from server import db
 
 JUDGE = {"on": True}  # --no-judge turns the model-judged scores off (they cost a call each)
 TABLES = ("tickets", "access_requests", "approvals", "audit_log", "write_keys", "consents")

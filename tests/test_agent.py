@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session as connect
 
-from brain import agent, db, gate, retrieval, status
+from brain import agent, gate, status
+
+from server import db, retrieval
 from brain.mcp_client import Toolbox
 from brain.plan import TurnPlan, parse_plan
 from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools
@@ -174,20 +176,24 @@ def test_consent_row_is_recorded_once(tmp_path):
 
 
 # ---- structure ----
+def _imports(path) -> set:
+    tree = ast.parse(path.read_text())
+    return ({a.name for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom)) for a in node.names}
+            | {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module})
+
+
 def test_graph_side_modules_never_touch_db_or_clock():
+    for p in (ROOT / "brain").rglob("*.py"):  # the MCP boundary as a folder: nothing agent-side imports the data side
+        assert not any(m == "server" or m.startswith("server.") for m in _imports(p)), p.name
     for n in ("graph", "agent", "mcp_client", "plan", "scope", "status"):
-        src = (ROOT / "brain" / f"{n}.py").read_text()
-        imports = {a.name for node in ast.walk(ast.parse(src)) if isinstance(node, (ast.Import, ast.ImportFrom))
-                   for a in node.names} | {node.module for node in ast.walk(ast.parse(src))
-                                           if isinstance(node, ast.ImportFrom) and node.module}
-        assert not imports & {"db", "tools", "retrieval", "sqlite3", "brain.db", "brain.tools", "brain.retrieval"}, n
-    for p in (ROOT / "brain").glob("*.py"):
+        assert not _imports(next((ROOT / "brain").rglob(f"{n}.py"))) & {"db", "tools", "retrieval", "sqlite3"}, n
+    for p in (ROOT / "brain").rglob("*.py"):
         t = p.read_text()
         assert "datetime.now" not in t and "time.time(" not in t and "utcnow" not in t, p.name
 
 
 def test_unknown_corpus_is_dropped_but_audience_filter_stays(monkeypatch):
-    from brain import tools
+    from server import tools
     seen = {}
     monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: seen.update(corpus=corpus, c=c) or [])
     tools.search_documents("x", "E010", corpus="policy_documents")
@@ -420,7 +426,7 @@ def test_first_question_cannot_skip_lookups(scripted, hits, tmp_path):
 
 
 def test_one_failed_tool_keeps_the_evidence_and_the_turn_is_not_failed(scripted, hits, monkeypatch, tmp_path):
-    from brain import retrieval
+    from server import retrieval
     calls = {"n": 0}
 
     def flaky(query, caller_id, k=5, corpus=None, **kw):
@@ -663,7 +669,7 @@ def test_a_failed_call_is_dropped_once_the_retry_succeeded():
 
 # ---- code-side facts (evals-and-code-facts) ----
 def test_subscription_rows_carry_comparisons_made_in_code():
-    from brain import tools
+    from server import tools
     rows = {r["system_name"]: r for r in tools.check_software_subscription("Webex") + tools.check_software_subscription("Miro")}
     assert rows["Webex"]["over_limit"] is True and rows["Webex"]["annual_cost_above_threshold"] is True
     assert rows["Miro"]["annual_cost"] == 7200 and rows["Miro"]["annual_cost_above_threshold"] is False
@@ -852,7 +858,7 @@ def test_a_freeze_search_that_never_returned_the_memo_is_tried_again(scripted, m
 
 
 def test_seat_expansion_is_priced_against_the_threshold_by_code():
-    from brain import tools
+    from server import tools
     plain = tools.check_software_subscription("Webex")[0]
     assert "expansion_above_threshold" not in plain
     two = tools.check_software_subscription("Webex", seats_to_add=2)[0]

@@ -110,7 +110,7 @@ def main():
     a = ap.parse_args()
 
     from langfuse import get_client
-    from brain import db
+    from server import db
     from brain.agent import handle_turn
 
     data = json.loads((config.ROOT / "data" / "GOLDEN-DATASETS.json").read_text())

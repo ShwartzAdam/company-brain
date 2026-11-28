@@ -1,4 +1,4 @@
-from brain import db
+from server import db
 
 
 def is_manager(employee_id: str, path=None) -> bool:

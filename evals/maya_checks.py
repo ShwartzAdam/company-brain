@@ -168,7 +168,7 @@ TABLES = ("tickets", "access_requests", "approvals", "write_keys", "audit_log", 
 
 
 def snapshot() -> dict:
-    from brain import db
+    from server import db
     return {t: hashlib.sha256(repr(db.rows(f"SELECT * FROM {t} ORDER BY 1")).encode()).hexdigest()[:12] for t in TABLES}
 
 
@@ -210,7 +210,9 @@ def main():
         print("REC " + json.dumps(run_turns(_session_with_caller(sid), int(first), int(last), thread, Path(ck))))
         return
 
-    from brain import config, db
+    from brain import config
+
+    from server import db
     ck = config.ROOT / "state" / "maya_checks.db"
     recs, before, after = [], {}, {}
     replay = None

@@ -10,7 +10,9 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session as connect
 
-from brain import agent, config, db, gate, retrieval, tools
+from brain import agent, config, gate
+
+from server import db, retrieval, tools
 from brain.mcp_client import Toolbox
 from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
 from brain.plan import TurnPlan

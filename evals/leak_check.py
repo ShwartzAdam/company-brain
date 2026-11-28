@@ -4,7 +4,7 @@ import sys
 
 from _common import GOLD  # noqa: F401
 
-from brain import opensearch, people, retrieval
+from server import opensearch, people, retrieval
 
 c = opensearch.client()
 QUERIES = ["how do I get promoted", "promotion cycle dates", "how do I run a performance review",

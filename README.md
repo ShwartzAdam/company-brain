@@ -23,9 +23,9 @@ python scripts/check_services.py
 
 ## Step 1: what exists
 - `brain/llm.py`: the only module that calls Bedrock (`complete`, `embed`). Tests swap in a fake.
-- `brain/db.py`: SQLite at `state/brain.db` built from the dataset's `schema.sql` + `seed.sql`, plus our own `write_keys` table.
-- `brain/ingest.py`, `brain/opensearch.py`, `brain/retrieval.py`: all 102 documents, chunked by heading (title prepended), indexed with `audience`.
-- `server/server.py` + `brain/tools.py`: MCP server on 127.0.0.1:9890. Reads: `search_documents`, `get_employee`, `list_direct_reports`, `check_software_subscription`, `get_contract`, `list_onboarding_tasks`, `check_asset_inventory`, `list_employee_tickets`, `read_approval`. Writes: `create_access_request`, `create_ticket`, `request_approval`, all through the single `release_write` and idempotent (employee + system + conversation id); they reuse `AR001`, `T001`, `AP001`, `AP002` instead of inserting duplicates.
+- `server/db.py`: SQLite at `state/brain.db` built from the dataset's `schema.sql` + `seed.sql`, plus our own `write_keys` table.
+- `server/ingest.py`, `server/opensearch.py`, `server/retrieval.py`: all 102 documents, chunked by heading (title prepended), indexed with `audience`.
+- `server/server.py` + `server/tools.py`: MCP server on 127.0.0.1:9890. Reads: `search_documents`, `get_employee`, `list_direct_reports`, `check_software_subscription`, `get_contract`, `list_onboarding_tasks`, `check_asset_inventory`, `list_employee_tickets`, `read_approval`. Writes: `create_access_request`, `create_ticket`, `request_approval`, all through the single `release_write` and idempotent (employee + system + conversation id); they reuse `AR001`, `T001`, `AP001`, `AP002` instead of inserting duplicates.
 
 Run (venv active):
 ```bash
@@ -75,7 +75,7 @@ Built and verified **offline** at Step 3 (66 pytest tests then, scripted fake mo
 
 ## Step 4: Webex (IT operations)
 
-Built in `brain/webex.py` (workflow and typed `AccessDecision`), `brain/gate.py`, `brain/tools.py`, `brain/graph.py` (`handoff` and `pause` nodes), `brain/agent.py` (`aresume_pending`).
+Built in `brain/webex.py` (workflow and typed `AccessDecision`), `brain/gate.py`, `server/tools.py`, `brain/graph.py` (`handoff` and `pause` nodes), `brain/agent.py` (`aresume_pending`).
 
 - **Flow.** classify, scope, gather (plus one targeted `it_kb` search so the Webex login article is always read, issue #13), then `handoff`. The real `WebexWorkflow` acts only when a request record already exists to reuse (Rachel's `AR001`); a first-ever request (Maya's) stays a pending handoff and writes nothing, so Maya's checks still hold. It reuses `AR001` and `T001` (no new rows), records the caller's consent, moves `AP001`/`AP002` from `needed` to `pending`, and the graph then **pauses with LangGraph `interrupt()`** on the SQLite checkpointer.
 - **AccessDecision** (`brain/webex.py`): observed facts (each with a `db:` source), actions actually taken, recommended next steps, the blocker (`seat_limit`: 42 active against a limit of 40), the status. It is built by code from tool results and its validator rejects any text that claims a grant; its rendering is appended to the model's prose.

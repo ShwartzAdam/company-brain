@@ -7,7 +7,9 @@ import re
 
 from langfuse import get_client, observe
 
-from brain import config, llm, people
+from brain import config, llm
+
+from server import people
 
 SRC = ["text", "source", "corpus", "audience", "title", "section", "doc_type", "system"]
 POOL = 30      # candidates fetched per query before fusion/rerank
@@ -148,7 +150,7 @@ def search(query: str, caller_id: str, k: int = 5, corpus: str | None = None, os
            mode: str = "rerank") -> list[dict]:
     """mode: vector | hybrid | rerank."""
     if os_client is None:
-        from brain import opensearch
+        from server import opensearch
         os_client = opensearch.client()
     def q(body, raw=False):
         r = os_client.search(index=config.INDEX_NAME, body=body)

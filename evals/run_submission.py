@@ -110,7 +110,8 @@ def dry_run(turns, save=None) -> list[dict]:
     os.environ["LANGFUSE_TRACING_ENABLED"] = "false"
     os.environ["BRAIN_DB_PATH"] = tempfile.mkdtemp() + "/dry.db"
     from mcp.shared.memory import create_connected_server_and_client_session as connect
-    from brain import agent, db, llm, mcp_client
+    from brain import agent, llm, mcp_client
+    from server import db
     from server.server import mcp
     llm.set_backend(DryBackend())
     ck = Path(tempfile.mkdtemp()) / "ck.db"
@@ -140,7 +141,8 @@ def live(turns, environment: str, prefix: str, save=None):
     lf = get_client()
     if not lf.auth_check():  # wrong or missing keys silently turn tracing into a no-op: stop before spending anything
         raise SystemExit("Langfuse rejected the keys: a run now would record nothing")
-    from brain import agent, db
+    from brain import agent
+    from server import db
     server = wr.start_server()
     ck = ROOT / "state" / f"submission_{environment}.db"
     try:
