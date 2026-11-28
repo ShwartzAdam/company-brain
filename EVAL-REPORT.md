@@ -95,3 +95,7 @@ Read from the `classify`, `gather`, `llm.complete` (answer) and `answer` observa
 9. **Smaller:** 9 of 114 gather spans contain a rejected call (the action model writes `{"tool": "search_documents", "args": {"done": true}}`); a duplicate-name request ("Daniel") is not made ambiguous by code; M-S-01 t10 searched `it_kb` and pulled in Rachel Stein's access profile while handling Maya.
 
 Where each failure sits: guard (6): S6 t1, S6 t2, S7 t1, S7 t3, S8 t2, W-S-01 t4. Ungrounded constraint (2): M-S-01 t1, t2, t3, t8, t12. Unchecked no-tool decision (1): M-S-01 t9, M-S-02 t5, S3 t7, Maya carry S2 t9 and S4 t8. Missing plan/date in the answer prompt (3): M-S-02 t5, S8 t3. Override mislabel (7): S4 t1.
+
+### Wrong answers the automated checks let through (found by reading S3 t3 and S4 t5 across runs)
+- **S3 t3** ("treat it as resolved"): 2 of 3 runs say ticket T001 "is already closed as resolved in the system". T001 is open. The model read the code-written fact `decision: closed - ...` (the user's decision) as database state; no tool was called to check. The check passes because it only looks for `resolved|closed|covered|Amir`.
+- **S4 t5** ("which of those three need Finance?"): across the 6 answers, two say Miro (7,200) is above 7,500 or "at the threshold", and two say "only Figma" or call Webex "not a procurement decision". All 6 pass because the check only requires the words Webex, Figma and Miro. Root cause: the number comparison is done by the model, and the check has no forbidden or exact fact.
