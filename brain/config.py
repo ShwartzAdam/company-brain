@@ -29,3 +29,7 @@ RUN_TURN_TIMEOUT_S = float(os.getenv("RUN_TURN_TIMEOUT_S", str(TURN_TIMEOUT_S + 
 BEDROCK_CONNECT_TIMEOUT_S = float(os.getenv("BEDROCK_CONNECT_TIMEOUT_S", "10"))
 BEDROCK_READ_TIMEOUT_S = float(os.getenv("BEDROCK_READ_TIMEOUT_S", "60"))
 BEDROCK_MAX_ATTEMPTS = int(os.getenv("BEDROCK_MAX_ATTEMPTS", "3"))
+
+# USD. The Q3 2026 memo (internal_memos/saas_renewal_freeze_q3.md) supersedes the policy's 5,000; evaluation pins 2026-07-01.
+# ponytail: one constant; read it from the memo or key it by as_of if the quarter changes.
+Q3_APPROVAL_THRESHOLD = 7500

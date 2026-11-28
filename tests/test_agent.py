@@ -652,3 +652,38 @@ def test_a_failed_call_is_dropped_once_the_retry_succeeded():
           {"tool": "get_employee", "args": {}, "result": "REJECTED: missing"},
           {"tool": "search_documents", "args": {"corpus": "x"}, "result": [{"source": "documents/a.md"}]}]
     assert [e["tool"] for e in live_evidence(ev)] == ["get_employee", "search_documents"]  # unretried failures stay visible
+
+
+# ---- code-side facts (evals-and-code-facts) ----
+def test_subscription_rows_carry_comparisons_made_in_code():
+    from brain import tools
+    rows = {r["system_name"]: r for r in tools.check_software_subscription("Webex") + tools.check_software_subscription("Miro")}
+    assert rows["Webex"]["over_limit"] is True and rows["Webex"]["above_q3_threshold"] is True
+    assert rows["Miro"]["annual_cost"] == 7200 and rows["Miro"]["above_q3_threshold"] is False
+    assert list(rows["Webex"])[:8] == ["subscription_id", "system_name", "vendor_name", "contract_id", "seat_limit",
+                                       "active_seats", "over_limit", "annual_cost"]
+
+
+def test_a_first_name_matching_two_employees_asks_instead_of_guessing(scripted, hits, tmp_path):
+    from brain.graph import ambiguous_first_name
+    ev = [{"tool": "get_employee", "args": {"query": "Daniel"}, "result": [
+        {"employee_id": "E002", "full_name": "Daniel Levi"}, {"employee_id": "E017", "full_name": "Daniel Cohen"}]}]
+    assert ambiguous_first_name(ev) == ("Daniel", [("E002", "Daniel Levi"), ("E017", "Daniel Cohen")])
+    assert ambiguous_first_name([{**ev[0], "args": {"query": "Daniel Levi"}}]) is None
+    scripted(plan("access_request"), '{"tool":"get_employee","args":{"query":"Daniel"}}', '{"done":true}', "Daniel can have it.")
+    r = turn("E010", "Give Daniel access to the tool.", "t-amb", tmp_path)
+    assert "Daniel Levi (E002)" in r.answer and "Daniel Cohen (E017)" in r.answer and r.status == "pending" and "Daniel can have it" not in r.answer
+
+
+def test_extra_wrong_answer_checks_catch_the_answers_the_golden_checks_passed():
+    import sys
+    sys.path.insert(0, str(ROOT / "evals"))
+    import session_replay as sr
+    t3 = {**{}, **sr.EXTRA["S3-intent-shift"]["3"]}
+    t5 = {**sr.EXTRA["S4-constraint-carry"]["5"]}
+    bad3 = "The Webex license issue for Rachel Stein (E010) is already closed as resolved in the system."
+    ok3 = "T001 is still open; you decided to treat it as resolved, and the seat expansion is with Amir."
+    assert sr.check_turn(t3, bad3, [], []) and not sr.check_turn(t3, ok3, [], [])
+    bad5 = "The Miro subscription (SUB014) at $7,200 is above the $7,500 threshold and also needs Finance approval."
+    ok5 = "Webex and Figma exceed 7,500 and need Finance. The Miro subscription at $7,200 does not exceed it, so it does not."
+    assert sr.check_turn(t5, bad5, [], []) and not sr.check_turn(t5, ok5, [], [])

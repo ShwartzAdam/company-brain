@@ -181,6 +181,16 @@ def _evidence(ev: list) -> tuple[str, int]:
     return "\n".join(lines) or "(none yet)", cut
 
 
+def ambiguous_first_name(ev: list):
+    """(name, [(id, full name)...]) when a one-word get_employee query matched more than one employee, else None."""
+    for e in ev:
+        q = str((e.get("args") or {}).get("query", "")).strip()
+        rows = [r for r in (e["result"] if isinstance(e["result"], list) else []) if isinstance(r, dict) and r.get("employee_id")]
+        if e["tool"] == "get_employee" and q and " " not in q and not re.fullmatch(r"E\d+|\S+@\S+", q) and len(rows) > 1:
+            return q, [(r["employee_id"], r["full_name"]) for r in rows]
+    return None
+
+
 def live_evidence(ev: list) -> list:
     """A failed or rejected call is dropped once a later call of the same tool returned a result: the answer must not
     say 'could not look it up' about something the retry found."""
@@ -400,7 +410,7 @@ ANSWER_SYSTEM = (
     "[documents/policies/byod_policy.md] or [db:onboarding_tasks/OT005]. Never use numbered citations like [1], and never cite a source that is not in the evidence. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
     "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
     "request to file something, say it has NOT been filed and what would be needed. If you could not look "
-    "something up, say so. At most six sentences. Terminal status of this turn: {status}.")
+    "something up, say so. Flags in the rows (over_limit, above_q3_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. At most six sentences. Terminal status of this turn: {status}.")
 
 
 def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tuple[str, list]:
@@ -437,10 +447,14 @@ def _row_facts(evidence: list) -> list[str]:
 async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
     evid = live_evidence(state["evidence"])
+    amb = ambiguous_first_name(evid)
     fallbacks = list(state.get("fallbacks") or [])
     status = final_status(error=bool(state["error"]), clarify=plan.intent == "ambiguous", refuse=plan.refuse,
                           action_unreleased=plan.intent == "access_request")
-    if plan.intent == "ambiguous":
+    if amb:  # a first name that matches several employees is never resolved by the model
+        status = final_status(error=False, clarify=True, refuse=False, action_unreleased=False)
+        text = f"Which {amb[0]} do you mean: " + " or ".join(f"{n} ({i})" for i, n in amb[1]) + "? Please give the full name or employee id."
+    elif plan.intent == "ambiguous":
         text = plan.clarify_question or "Which one do you mean? Please give a name or system."
     elif status == "failed":
         text = f"I could not complete this: {state['error']}."

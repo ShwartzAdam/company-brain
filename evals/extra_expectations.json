@@ -1,0 +1,11 @@
+{
+ "_readme": "Our own wrong-answer checks on top of data/GOLDEN-DATASETS.json (never edited). forbidden_regex: a match fails the turn. Found by reading answers that passed the golden checks (EVAL-REPORT.md).",
+ "S3-intent-shift": {
+  "3": {"forbidden_regex": ["(ticket|T001|issue)[^.]{0,60}(already )?(is |been )?(marked as )?closed( as resolved)?( in the system| with the decision)", "closed as resolved in the system"],
+        "why": "T001 is open; the user's 'treat it as resolved' is a decision, not a database state"}
+ },
+ "S4-constraint-carry": {
+  "5": {"forbidden_regex": ["miro[^.]{0,90}(?<!not )(?<!n't )\\b(above|exceeds)\\b", "miro[^.]{0,90}(at the threshold|may need finance)"],
+        "why": "Miro is 7,200 against a 7,500 threshold; the golden check only requires the three names"}
+ }
+}
