@@ -66,3 +66,9 @@ Course habits that would have cut it: one session first, repeats only for the tu
 - Gap 3: classify can return a `search_query`; the forced search and the gather prompt use it. The `corpus` argument was already normalised in
   `tools.search_documents` (an unknown or list value becomes no filter). No per-corpus plan.
 Risk to read live before trusting: the capped replies and the new classify field change classify's input and schema.
+
+## H. Review fixes made offline (unit tests only)
+- The subscription flag is now `annual_cost_above_threshold` (whole contract) next to `cost_per_seat`; the answer prompt says an expansion is judged by its increase.
+- The freeze-memo note is stored only after a document search succeeded, so a failed search is retried on the next turn.
+- A first name is no longer "ambiguous" once a later lookup by full name or id found the person.
+- `clean_citations` keeps a `#section` form of a real source; rule extraction accepts reworded memos and no longer claims more than the memo says.

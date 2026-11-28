@@ -28,8 +28,7 @@ contract bodies beyond header fields.
    hybrid, no addendum file, but her offer letter lists monitor and dock. Eligible, citing the offer
    letter and the memo (question `M-I-03`).
 2. **Webex expansion vs USD 7,500.** Two extra seats cost roughly USD 920 (18,400 / 40 per seat),
-   under the threshold. The Q3 memo applies the threshold to the **increment**, not the contract total (expansion to 50 seats adds 3,600, still under 7,500). The Q3 memo applies the threshold to the **increment**, not the contract
-   total (expansion to 50 seats adds 3,600, still under 7,500). Yet the Webex memo, `AP002` and the KB require Finance approval for any
+   under the threshold. The Q3 memo applies the threshold to the **increment**, not the contract total (expansion to 50 seats adds 3,600, still under 7,500). Yet the Webex memo, `AP002` and the KB require Finance approval for any
    expansion. Do not apply the threshold mechanically.
 3. **Outdated runbook line.** `it_kb/webex_license_assignment.md` mentions an old "add temporary
    seats and reconcile later" practice and marks it invalid. Never present it as current advice.

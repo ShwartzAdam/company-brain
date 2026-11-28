@@ -4,9 +4,10 @@ import re
 
 from pydantic import BaseModel
 
-_THRESHOLD = re.compile(r"(?P<what>SaaS expansions?)\s+above\s+USD\s+(?P<usd>[\d,]+)\s+(?P<basis>annualized)\s+require\s+"
-                        r"(?P<who>[A-Za-z ]+?)\s+approval", re.I)
-_OLDER = re.compile(r"older\s+USD\s+(?P<usd>[\d,]+)\s+threshold", re.I)
+_THRESHOLD = re.compile(r"(?P<what>SaaS\s+(?:expansions?|renewals?|purchases?|spend))\s+(?:above|over|exceeding)\s+(?:USD\s*|\$\s*)(?P<usd>[\d,]+)\s+"
+                        r"(?P<basis>annuali[sz]ed|annual|per\s+year|a\s+year)\s+(?:requires?|needs?)\s+"
+                        r"(?P<who>[A-Za-z ]+?)\s+(?:approval|sign-?\s?off)", re.I)
+_OLDER = re.compile(r"older\s+(?:USD\s*|\$\s*)(?P<usd>[\d,]+)\s+threshold", re.I)
 
 
 class Rule(BaseModel):
@@ -20,7 +21,7 @@ class Rule(BaseModel):
     def render(self) -> str:
         sup = f" It supersedes the older USD {self.supersedes_usd:,} threshold." if self.supersedes_usd else ""
         return (f"{self.name} [{self.source}]: {self.applies_to} above USD {self.threshold_usd:,} need {self.needs} approval."
-                f"{sup} It does not block purchases or provisioning below that amount.")
+                f"{sup} The memo sets an approval threshold, not a ban: it does not cover amounts below it.")
 
 
 def extract_rules(evidence: list) -> list[dict]:

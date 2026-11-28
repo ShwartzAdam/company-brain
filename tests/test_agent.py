@@ -663,8 +663,9 @@ def test_a_failed_call_is_dropped_once_the_retry_succeeded():
 def test_subscription_rows_carry_comparisons_made_in_code():
     from brain import tools
     rows = {r["system_name"]: r for r in tools.check_software_subscription("Webex") + tools.check_software_subscription("Miro")}
-    assert rows["Webex"]["over_limit"] is True and rows["Webex"]["above_q3_threshold"] is True
-    assert rows["Miro"]["annual_cost"] == 7200 and rows["Miro"]["above_q3_threshold"] is False
+    assert rows["Webex"]["over_limit"] is True and rows["Webex"]["annual_cost_above_threshold"] is True
+    assert rows["Miro"]["annual_cost"] == 7200 and rows["Miro"]["annual_cost_above_threshold"] is False
+    assert rows["Webex"]["cost_per_seat"] == round(rows["Webex"]["annual_cost"] / rows["Webex"]["seat_limit"], 2) < 7500  # two seats stay far under it
     assert list(rows["Webex"])[:8] == ["subscription_id", "system_name", "vendor_name", "contract_id", "seat_limit",
                                        "active_seats", "over_limit", "annual_cost"]
 
@@ -705,7 +706,7 @@ def test_a_rule_is_read_from_the_memo_by_code_and_rendered_exactly():
     (r,) = extract_rules(ev)
     assert r["threshold_usd"] == 7500 and r["needs"] == "Finance" and r["supersedes_usd"] == 5000
     line = Rule(**r).render()
-    assert "above USD 7,500" in line and "does not block purchases" in line and "saas_renewal_freeze_q3.md" in line
+    assert "above USD 7,500" in line and "not a ban" in line and "saas_renewal_freeze_q3.md" in line
     assert extract_rules([{"tool": "x", "args": {}, "result": [{"source": "documents/policies/other.md", "text": MEMO}]}]) == []
 
 
@@ -772,3 +773,52 @@ def test_planner_rereads_only_a_capped_assistant_reply():
     long = "x" * 900
     body = classify_prompt([{"role": "user", "content": "q" * 900}, {"role": "assistant", "content": long}], "next", [], [])[0]["content"]
     assert "x" * 400 + " ...[cut]" in body and "x" * 401 not in body and "q" * 900 in body
+
+
+# ---- review fixes (offline) ----
+def test_a_failed_freeze_search_is_tried_again_next_turn(scripted, monkeypatch, tmp_path):
+    def boom(*a, **kw):
+        raise RuntimeError("index down")
+    monkeypatch.setattr(retrieval, "search", boom)
+    scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]),
+             '{"tool":"search_documents","args":{"query":"Q3 freeze"}}', '{"done":true}', "could not look it up")
+    r = turn("E004", "Maya starts 2026-08-01 and the Q3 SaaS freeze applies. Pull up her record.", "t-f2", tmp_path, "UG_HR")
+    assert "freeze_memo_lookup_forced" in r.extra["fallbacks"]
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: [
+        {"source": "documents/internal_memos/saas_renewal_freeze_q3.md", "text": MEMO, "section": "s", "audience": "all", "score": 1.0}])
+    scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]),
+             '{"tool":"search_documents","args":{"query":"Q3 freeze"}}', '{"done":true}', "ok")
+    r2 = turn("E004", "And does the freeze change anything?", "t-f2", tmp_path, "UG_HR")
+    assert "freeze_memo_lookup_forced" in r2.extra["fallbacks"] and "search_documents" in r2.tool_sequence
+
+
+def test_a_first_name_the_model_resolved_by_full_name_does_not_ask():
+    from brain.graph import ambiguous_first_name
+    two = {"tool": "get_employee", "args": {"query": "Daniel"}, "result": [
+        {"employee_id": "E002", "full_name": "Daniel Levi"}, {"employee_id": "E017", "full_name": "Daniel Cohen"}]}
+    one = {"tool": "get_employee", "args": {"query": "Daniel Levi"}, "result": [{"employee_id": "E002", "full_name": "Daniel Levi"}]}
+    assert ambiguous_first_name([two]) is not None
+    assert ambiguous_first_name([two, one]) is None
+    assert ambiguous_first_name([two, {**one, "args": {"query": "Sara Cohen"}}]) is not None  # someone else's lookup resolves nothing
+
+
+def test_clean_citations_keeps_every_real_source_shape():
+    from brain.graph import clean_citations
+    allowed = {"db:tickets/T001", "db:software_subscriptions/SUB001", "documents/policies/byod_policy.md", "documents/it_kb/webex_login_issue.md"}
+    text = ("T001 is open [db:tickets/T001]. Seats are 42 [db:software_subscriptions/SUB001]. MFA [documents/policies/byod_policy.md]. "
+            "Login [documents/it_kb/webex_login_issue.md#steps]. Made up [documents/policies/none.md] and [1].")
+    out, dropped = clean_citations(text, allowed, {})
+    assert dropped == ["documents/policies/none.md", "1"]
+    assert all(s in out for s in ("[db:tickets/T001]", "[db:software_subscriptions/SUB001]", "[documents/policies/byod_policy.md]",
+                                  "[documents/it_kb/webex_login_issue.md#steps]")) and "none.md" not in out
+
+
+def test_rule_extraction_survives_a_reworded_memo_and_ignores_a_different_one():
+    from brain.rules import extract_rules
+    src = "documents/internal_memos/saas_renewal_freeze_q3.md"
+    worded = ("Memo Q3 freeze. SaaS expansions over $7,500 a year need Finance sign-off. "
+              "This replaces the older $5,000 threshold in the procurement policy.")
+    (r,) = extract_rules([{"tool": "search_documents", "args": {}, "result": [{"source": src, "text": worded}]}])
+    assert r["threshold_usd"] == 7500 and r["needs"] == "Finance" and r["supersedes_usd"] == 5000
+    other = [{"tool": "search_documents", "args": {}, "result": [{"source": src, "text": "The freeze lasts until September."}]}]
+    assert extract_rules(other) == []  # no threshold sentence, no rule: nothing is invented

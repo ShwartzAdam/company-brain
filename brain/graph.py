@@ -97,7 +97,6 @@ async def classify(state: State, config) -> dict:
         # a freeze the user mentions is a label until the memo is read; code makes the model read it once per conversation
         plan.requires_tools = True
         plan.lookups_needed = [*plan.lookups_needed, "what the Q3 SaaS renewal freeze memo says: its threshold and who must approve"]
-        grounded.append(FREEZE_NOTE)
         fallbacks.append("freeze_memo_lookup_forced")
     _io({"message": state["message"][:300], "constraints": state.get("constraints")},
         {"intent": plan.intent, "requires_tools": plan.requires_tools, "lookups_needed": plan.lookups_needed,
@@ -191,16 +190,26 @@ def _evidence(ev: list) -> tuple[str, int]:
 
 def ambiguous_first_name(ev: list):
     """(name, [(id, full name)...]) when a one-word get_employee query matched more than one employee, else None."""
-    for e in ev:
+    for i, e in enumerate(ev):
         q = str((e.get("args") or {}).get("query", "")).strip()
         rows = [r for r in (e["result"] if isinstance(e["result"], list) else []) if isinstance(r, dict) and r.get("employee_id")]
         if e["tool"] == "get_employee" and q and " " not in q and not re.fullmatch(r"E\d+|\S+@\S+", q) and len(rows) > 1:
+            if any(x["tool"] == "get_employee" and q.lower() in str((x.get("args") or {}).get("query", "")).lower()
+                   and (" " in str((x.get("args") or {}).get("query", "")).strip() or re.fullmatch(r"E\d+", str((x.get("args") or {}).get("query", "")).strip()))
+                   and isinstance(x["result"], list) and x["result"] for x in ev[i + 1:]):
+                continue  # a later lookup with the full name or id found the person: the model resolved it from the conversation
             return q, [(r["employee_id"], r["full_name"]) for r in rows]
     return None
 
 
 def _rule_lines(state) -> list[str]:
     return [Rule(**r).render() for r in state.get("rules") or []]
+
+
+def _searched(ev: list) -> bool:
+    """A document search returned a result (not an ERROR or REJECTED row)."""
+    return any(e["tool"] == "search_documents" and not (isinstance(e["result"], str) and e["result"].startswith(("ERROR:", "REJECTED:")))
+               for e in ev)
 
 
 def memory_lines(state) -> list[str]:
@@ -433,7 +442,7 @@ ANSWER_SYSTEM = (
     "[documents/policies/byod_policy.md] or [db:onboarding_tasks/OT005]. Never use numbered citations like [1], and never cite a source that is not in the evidence. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
     "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
     "request to file something, say it has NOT been filed and what would be needed. If you could not look "
-    "something up, say so. Flags in the rows (over_limit, above_q3_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. At most six sentences. Terminal status of this turn: {status}.")
+    "something up, say so. Flags in the rows (over_limit, annual_cost_above_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. annual_cost_above_threshold compares the WHOLE contract cost with the approval threshold; for adding seats the threshold applies to the increase (cost_per_seat times the seats added), so never say the contract total alone decides it. At most six sentences. Terminal status of this turn: {status}.")
 
 
 def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tuple[str, list]:
@@ -441,7 +450,7 @@ def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tu
     Any other bracket that is not a source in this turn's evidence or facts ([constraints], [user instruction]) is removed."""
     for n, srcs in (numbered or {}).items():
         text = text.replace(f"[{n}]", "".join(f"[{x}]" for x in srcs))
-    dropped = [b for b in re.findall(r"\[([^\[\]]+)\]", text) if b not in allowed]  # innermost brackets only
+    dropped = [b for b in re.findall(r"\[([^\[\]]+)\]", text) if b not in allowed and b.split("#")[0].strip() not in allowed]  # innermost brackets only
     for b in dropped:
         text = text.replace(f"[{b}]", "")
     return re.sub(r"\s+([.,;])", r"\1", re.sub(r" {2,}", " ", text)).strip(), dropped
@@ -533,7 +542,8 @@ async def answer(state: State, config) -> dict:
     _io({"evidence_items": len(evid), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(evid)
-    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(evid)]), "rules": state["rules"],
+    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [*(FREEZE_NOTE for _ in [0] if "freeze_memo_lookup_forced" in fallbacks and _searched(evid)),
+                                                  *(f"{plan.intent}: {f}" for f in _row_facts(evid))]), "rules": state["rules"],
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 
