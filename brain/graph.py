@@ -401,7 +401,7 @@ def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tu
     Any other bracket that is not a source in this turn's evidence or facts ([constraints], [user instruction]) is removed."""
     for n, srcs in (numbered or {}).items():
         text = text.replace(f"[{n}]", "".join(f"[{x}]" for x in srcs))
-    dropped = [b for b in re.findall(r"\[([^\]]+)\]", text) if b not in allowed]
+    dropped = [b for b in re.findall(r"\[([^\[\]]+)\]", text) if b not in allowed]  # innermost brackets only
     for b in dropped:
         text = text.replace(f"[{b}]", "")
     return re.sub(r"\s+([.,;])", r"\1", re.sub(r" {2,}", " ", text)).strip(), dropped

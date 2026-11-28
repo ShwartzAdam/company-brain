@@ -638,3 +638,9 @@ def test_a_mentioned_freeze_forces_one_memo_lookup(scripted, hits, tmp_path):
     scripted(plan("onboarding_status", False), "recalled")
     r2 = turn("E004", "Remind me what freeze I mentioned.", "t-f1", tmp_path, "UG_HR")
     assert r2.tool_sequence == [] and "freeze_memo_lookup_forced" not in r2.extra["fallbacks"]
+
+
+def test_clean_citations_leaves_nested_brackets_whole():
+    from brain.graph import clean_citations
+    t, d = clean_citations("Starts 2026-08-01 [onboarding_status: [db:employees/E001]].", {"db:employees/E001"})
+    assert "]]" in t and "[db:employees/E001]" in t and d == []
