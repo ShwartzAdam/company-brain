@@ -26,7 +26,7 @@ GLOSS = (
 CLASSIFY_SYSTEM = (
     GLOSS + "\n\nYou classify the newest message of a NovaOps assistant session. Return ONLY a JSON object:\n"
     '{"intent": <intent>, "requires_tools": bool, "relevant_facts": [str], "relevant_constraints": [str], '
-    '"clarify_question": str, "refuse": bool, "closes_topic": str, "lookups_needed": [str]}\n'
+    '"clarify_question": str, "refuse": bool, "closes_topic": str, "lookups_needed": [str], "needed_facts": [str]}\n'
     "- Classify the newest message only; follow subject changes.\n"
     "- You know nothing about NovaOps beyond this conversation. A first question, and any question about a policy, "
     "person, system, record or document, requires_tools True.\n"
@@ -38,6 +38,7 @@ CLASSIFY_SYSTEM = (
     "ask for lookups only for values that are NOT listed there.\n"
     "- Known facts that are database rows are an OLD SNAPSHOT. If the user asks what is true NOW, or needs a rule or "
     "number from a document that is not in the facts, requires_tools True.\n"
+    "- needed_facts: the specific facts the answer must state (a number, status, name, date, rule), one short item each. Only what the newest message asks for; empty for recalling the user's own words.\n"
     "- lookups_needed: list each distinct thing to look up. A question that needs a rule from a document AND a number "
     "from a record needs both.\n"
     "- relevant_facts and relevant_constraints come ONLY from the user's own words, never from the assistant's replies. "
@@ -62,6 +63,9 @@ class TurnPlan(BaseModel):
     lookups_needed: list[str] = Field(default_factory=list, description=(
         "One short item per distinct thing that must be looked up to answer, e.g. 'Webex annual cost' and 'the Q3 "
         "approval threshold'. Empty when no lookup is needed."))
+    needed_facts: list[str] = Field(default_factory=list, description=(
+        "The specific facts the answer must state (a number, status, name, date or rule), one short item each; empty for "
+        "pure recall of the user's own words."))
     subject_name: str = Field(default="", description=(
         "For an access request: the full name of the person it is for, taken from the user's words or the Known "
         "facts ('her' means the person named earlier, not the caller); otherwise empty."))

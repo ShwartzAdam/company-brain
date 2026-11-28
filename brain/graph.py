@@ -12,6 +12,7 @@ from langgraph.types import interrupt
 from brain import checklist, gate, llm
 from brain.handoff import WebexHandoff, make_key
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
+from brain.rules import Rule, extract_rules
 from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
 from brain.status import answer_agrees, claims_done, final_status
 from brain.webex import AccessDecision, release_pending
@@ -27,6 +28,7 @@ class State(TypedDict, total=False):
     messages: Annotated[list, operator.add]   # whole conversation, survives restarts
     facts: list
     constraints: list
+    rules: list           # typed Rule dicts read by code from documents (not the model's words)
     handoffs: dict        # idempotency key -> handoff already made in this conversation
     handoff: dict         # this turn's handoff, if any
     handoff_calls: int
@@ -74,7 +76,8 @@ def _node(name):
 
 @_node("classify")
 async def classify(state: State, config) -> dict:
-    msgs = classify_prompt(_window(state), state["message"], state.get("facts"), state.get("constraints"))
+    msgs = classify_prompt(_window(state), state["message"], state.get("facts"),
+                           [*(state.get("constraints") or []), *_rule_lines(state)])
     fallbacks = []
     try:
         plan = parse_plan(llm.structured(msgs, CLASSIFY_SYSTEM, PLAN_SCHEMA, name="classify", max_tokens=1000))
@@ -87,9 +90,16 @@ async def classify(state: State, config) -> dict:
         plan.requires_tools = True  # the prompt says a first question needs a lookup; code enforces it: nothing to answer from
         fallbacks.append("requires_tools_forced_first_turn")
     grounded = list(state.get("facts") or [])
+    if not plan.requires_tools and not plan.refuse and plan.intent not in ("other", "ambiguous") and state.get("messages"):
+        missing = missing_facts(plan.needed_facts, " ".join([*grounded, *(state.get("constraints") or []), *_rule_lines(state),
+                                                              *(m["content"] for m in _window(state))]))
+        if missing:  # the model said 'answerable from memory'; code checks the memory for each fact it said it needs
+            plan.requires_tools = True
+            plan.lookups_needed = [*plan.lookups_needed, *missing]
+            fallbacks.append("needed_facts_missing")
     if (_FREEZE.search(" ".join([state["message"], *(state.get("constraints") or []), *plan.relevant_constraints]))
             and not plan.refuse and plan.intent != "ambiguous" and "search_documents" in LOADOUTS.get(plan.intent, ("", ()))[1]
-            and not any("saas_renewal_freeze" in f or f == FREEZE_NOTE for f in grounded)):
+            and not state.get("rules") and not any("saas_renewal_freeze" in f or f == FREEZE_NOTE for f in grounded)):
         # a freeze the user mentions is a label until the memo is read; code makes the model read it once per conversation
         plan.requires_tools = True
         plan.lookups_needed = [*plan.lookups_needed, "what the Q3 SaaS renewal freeze memo says: its threshold and who must approve"]
@@ -189,6 +199,26 @@ def ambiguous_first_name(ev: list):
         if e["tool"] == "get_employee" and q and " " not in q and not re.fullmatch(r"E\d+|\S+@\S+", q) and len(rows) > 1:
             return q, [(r["employee_id"], r["full_name"]) for r in rows]
     return None
+
+
+_GENERIC = {"name", "person", "first", "question", "status", "details", "information", "current", "latest", "user", "what",
+            "which", "that", "this", "their", "with", "from", "have", "about", "the", "and", "for", "are", "was", "has",
+            "number", "date", "value", "list", "summary", "answer", "request", "they"}
+
+
+def missing_facts(needed: list, haystack: str) -> list:
+    """A needed fact is present when most of its specific words (not generic ones) appear in memory. Lexical, so it only
+    catches facts whose subject was never mentioned. ponytail: typed slots per fact kind if this misses too much."""
+    hay, out = haystack.lower(), []
+    for fact in needed:
+        words = [w for w in re.findall(r"[a-z0-9][a-z0-9,.\-]*[a-z0-9]|[a-z0-9]", fact.lower()) if len(w) > 2 and w not in _GENERIC]
+        if words and sum(w in hay for w in words) < 0.6 * len(words):
+            out.append(fact)
+    return out
+
+
+def _rule_lines(state) -> list[str]:
+    return [Rule(**r).render() for r in state.get("rules") or []]
 
 
 def live_evidence(ev: list) -> list:
@@ -448,6 +478,8 @@ async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
     evid = live_evidence(state["evidence"])
     amb = ambiguous_first_name(evid)
+    rules = {r["name"]: r for r in [*(state.get("rules") or []), *extract_rules(evid)]}  # newest reading of a rule wins
+    state = {**state, "rules": list(rules.values())}
     fallbacks = list(state.get("fallbacks") or [])
     status = final_status(error=bool(state["error"]), clarify=plan.intent == "ambiguous", refuse=plan.refuse,
                           action_unreleased=plan.intent == "access_request")
@@ -465,7 +497,8 @@ async def answer(state: State, config) -> dict:
             get_client().update_current_span(level="WARNING", status_message=f"evidence shortened by {cut} characters")
         subj = ", ".join(x for x in (f"for {plan.subject_name}" if plan.subject_name else "",
                                      f"system {plan.system_name}" if plan.system_name else "") if x)
-        body = (f"Today: {config['configurable'].get('as_of', '')[:10]}\n" + (f"This request is {subj}.\n" if subj else "") +
+        rl = _rule_lines(state)
+        body = ((f"Rules in force (read from documents by code):\n" + "\n".join(f"- {x}" for x in rl) + "\n") if rl else "") + (f"Today: {config['configurable'].get('as_of', '')[:10]}\n" + (f"This request is {subj}.\n" if subj else "") +
                 f"Facts: {state.get('facts')}\nConstraints: {state.get('constraints')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
                 f"Evidence:\n{ev_text}\n\nQuestion:\n{state['message']}")
@@ -498,7 +531,7 @@ async def answer(state: State, config) -> dict:
     _io({"evidence_items": len(evid), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(evid)
-    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(evid)]),
+    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [f"{plan.intent}: {f}" for f in _row_facts(evid)]), "rules": state["rules"],
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 

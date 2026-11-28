@@ -687,3 +687,46 @@ def test_extra_wrong_answer_checks_catch_the_answers_the_golden_checks_passed():
     bad5 = "The Miro subscription (SUB014) at $7,200 is above the $7,500 threshold and also needs Finance approval."
     ok5 = "Webex and Figma exceed 7,500 and need Finance. The Miro subscription at $7,200 does not exceed it, so it does not."
     assert sr.check_turn(t5, bad5, [], []) and not sr.check_turn(t5, ok5, [], [])
+
+
+# ---- typed memory ----
+MEMO = ("Memo: Saas Renewal Freeze Q3 Date: 2026-06-25 For Q3 2026, SaaS expansions above USD 7,500 annualized require Finance "
+        "approval. This supersedes the older USD 5,000 threshold in SaaS Procurement Policy.")
+
+
+def test_a_rule_is_read_from_the_memo_by_code_and_rendered_exactly():
+    from brain.rules import Rule, extract_rules
+    ev = [{"tool": "search_documents", "args": {}, "result": [{"source": "documents/internal_memos/saas_renewal_freeze_q3.md", "text": MEMO}]}]
+    (r,) = extract_rules(ev)
+    assert r["threshold_usd"] == 7500 and r["needs"] == "Finance" and r["supersedes_usd"] == 5000
+    line = Rule(**r).render()
+    assert "above USD 7,500" in line and "does not block purchases" in line and "saas_renewal_freeze_q3.md" in line
+    assert extract_rules([{"tool": "x", "args": {}, "result": [{"source": "documents/policies/other.md", "text": MEMO}]}]) == []
+
+
+def test_the_rule_is_kept_and_shown_to_the_answer_on_later_turns(scripted, tmp_path, monkeypatch):
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: [
+        {"source": "documents/internal_memos/saas_renewal_freeze_q3.md", "text": MEMO, "section": "s", "audience": "all", "score": 1.0}])
+    scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]),
+             '{"tool":"search_documents","args":{"query":"freeze"}}', '{"done":true}', "first")
+    turn("E004", "Maya starts 2026-08-01 and the Q3 SaaS freeze applies. Pull up her record.", "t-r1", tmp_path, "UG_HR")
+    b = scripted(plan("onboarding_status", False), "second")
+    turn("E004", "Remind me what I said.", "t-r1", tmp_path, "UG_HR")
+    body = next(c[0][0]["content"] for c in b.calls if "Rules in force" in c[0][0]["content"])
+    assert "above USD 7,500" in body and "Finance" in body
+
+
+def test_missing_facts_is_lexical_and_ignores_generic_words():
+    from brain.graph import missing_facts
+    hay = "maya cohen starts 2026-08-01 webex subscription sub001 annual_cost=18400 over_limit=true"
+    assert missing_facts(["Webex annual cost", "name of the person"], hay) == []
+    assert missing_facts(["Finance approval threshold for expansion"], hay) == ["Finance approval threshold for expansion"]
+
+
+def test_a_fact_the_memory_does_not_hold_forces_a_lookup_after_turn_one(scripted, hits, tmp_path):
+    scripted(plan("policy_question"), '{"tool":"search_documents","args":{"query":"a"}}', '{"done":true}', "one")
+    turn("E004", "How do I get VPN?", "t-n1", tmp_path, "UG_HR")
+    scripted(plan("policy_question", False, needed_facts=["Okta password rotation interval"]),
+             '{"tool":"search_documents","args":{"query":"okta"}}', '{"done":true}', "two")
+    r = turn("E004", "And how often must Okta passwords rotate?", "t-n1", tmp_path, "UG_HR")
+    assert "needed_facts_missing" in r.extra["fallbacks"] and "search_documents" in r.tool_sequence
