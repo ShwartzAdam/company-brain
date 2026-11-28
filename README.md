@@ -110,7 +110,7 @@ agent.turn            input: the message; output: the answer
     llm.structured:action  /  tool.<name>  ->  server.<name>   (the MCP server's own span, same trace)
   rearm               only when a required lookup never ran
   handoff             consent_decision (why a write may follow), approval_transition (needed -> pending), tool.* writes
-  answer              status and the answer; WARNING when code rewrote an answer that disagreed with the status
+  answer              status and the answer; WARNING when code dropped the sentences of an answer that claimed a filing or grant (negated sentences such as "no request has been filed yet" are kept); the answer prompt also carries today's date (`as_of`) and the classified subject and system
   pause / pause.resume   a pause is a normal outcome (not an ERROR)
 agent.resume          its own trace; metadata resume_of = the paused turn's request_id, origin_trace_id = that turn's trace
   approval_transition (release): approval rows before, released or not

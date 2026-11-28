@@ -1,0 +1,201 @@
+{
+ "W-I-02": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "d22d57da6826b9cf463c5467d92eafd5"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "f2a1f3cd85a72ed9d969c75820bd369b"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "7a57a8ae5b9dfec79a52ee36adaceb0b"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "9eeef8253ad69c93f94e1d9db164a9f7"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "e6531227d5e1105361c2f5d1562a63b6"
+    }
+   ],
+   "fails": [
+    "missing fact \"not recorded|no record|does not record|doesn't record|do not record|cannot tell|not tracked\""
+   ],
+   "passes": 4,
+   "runs": 5,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:access_requests/AR001",
+    "db:employees/E001",
+    "db:employees/E003",
+    "db:employees/E010",
+    "db:onboarding_tasks/OT005",
+    "db:software_subscriptions/SUB001"
+   ],
+   "status": "completed",
+   "tools": [
+    "list_direct_reports",
+    "seat_assignment_status"
+   ]
+  }
+ },
+ "W-I-03": {
+  "1": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "d05c307e980fe3fe0a5ed264a9008496"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "judge_overstates": 0.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "5b9ddbda198310dd0ccc90d75315629c"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "judge_overstates": 0.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "9a7f7de1b0d7f45fdef048536dd6e508"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "judge_overstates": 0.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "0f820c3d1569337557cf4dd7dd2963b6"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "judge_faithfulness": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "8be4b5c84c9c64d7b21f5155ccbc1f08"
+    }
+   ],
+   "fails": [
+    "AP001 is 'needed', expected 'pending'",
+    "AP002 is 'needed', expected 'pending'",
+    "did not pause",
+    "missing fact 'AP001'",
+    "missing fact 'AR001'",
+    "missing fact 'T001'",
+    "missing fact 'pending'",
+    "replay changed audit_log: 2 -> 4",
+    "replay changed consents: 0 -> 1",
+    "replay changed write_keys: 0 -> 4"
+   ],
+   "passes": 3,
+   "runs": 5,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "judge_faithfulness": 1.0,
+    "judge_overstates": 0.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "sources": [
+    "db:employees/E010",
+    "db:software_subscriptions/SUB001",
+    "documents/employment/rachel_stein_customer_success_access_profile.md",
+    "documents/internal_memos/webex_license_cleanup_memo.md",
+    "documents/it_kb/webex_license_assignment.md",
+    "documents/it_kb/webex_login_issue.md",
+    "documents/policies/onboarding_policy.md"
+   ],
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "check_software_subscription",
+    "search_documents"
+   ]
+  }
+ }
+}
