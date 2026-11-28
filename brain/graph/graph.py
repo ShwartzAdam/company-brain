@@ -8,17 +8,21 @@ from typing import Annotated, TypedDict
 from langfuse import get_client, observe
 from langgraph.types import interrupt
 
-from brain import checklist, gate, llm
-from brain.claims import clean_citations, ground
-from brain.evidence import (ambiguous_first_name, evidence_text, live_evidence, render_evidence,
+from brain import llm
+
+from brain.answer import checklist
+
+from brain.webex import gate
+from brain.answer.claims import clean_citations, ground
+from brain.graph.evidence import (ambiguous_first_name, evidence_text, live_evidence, render_evidence,
                             row_facts, sources_of)
-from brain.handoff import WebexHandoff, make_key
-from brain.prompts import ANSWER_SYSTEM, GATHER_SYSTEM
-from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
-from brain.rules import Rule, extract_rules
-from brain.scope import LOADOUTS, WRITE_TOOLS, select_tools, widen_reads
-from brain.status import answer_agrees, claims_done, final_status
-from brain.webex import AccessDecision, release_pending
+from brain.webex.handoff import WebexHandoff, make_key
+from brain.graph.prompts import ANSWER_SYSTEM, GATHER_SYSTEM
+from brain.graph.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
+from brain.answer.rules import Rule, extract_rules
+from brain.graph.scope import LOADOUTS, WRITE_TOOLS, select_tools, widen_reads
+from brain.answer.status import answer_agrees, claims_done, final_status
+from brain.webex.webex import AccessDecision, release_pending
 
 MAX_STEPS = 6
 MAX_FACTS = 60

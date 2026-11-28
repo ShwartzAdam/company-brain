@@ -52,5 +52,5 @@ def test_calibration_runner_reports_a_judge_that_cannot_separate():
 
 
 def test_planted_overclaims_trip_the_deterministic_floor():
-    from brain.status import answer_agrees
+    from brain.answer.status import answer_agrees
     assert not answer_agrees("pending", CASES["overstates"][0]["answer"].replace("submitted the Webex request for Maya", "filed it"))

@@ -6,12 +6,16 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session as connect
 
-from brain import agent, gate, status
+from brain import agent
+
+from brain.answer import status
+
+from brain.webex import gate
 
 from server import db, retrieval
 from brain.mcp_client import Toolbox
-from brain.plan import TurnPlan, parse_plan
-from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools
+from brain.graph.plan import TurnPlan, parse_plan
+from brain.graph.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools
 from server.server import mcp
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -214,7 +218,7 @@ def test_facts_hold_tool_rows_never_the_models_sentences(scripted, hits, tmp_pat
 
 
 def test_snapshot_rule_is_in_the_classify_prompt():
-    from brain.plan import CLASSIFY_SYSTEM
+    from brain.graph.plan import CLASSIFY_SYSTEM
     assert "OLD SNAPSHOT" in CLASSIFY_SYSTEM and "ONLY from the user's own words" in CLASSIFY_SYSTEM
 
 
@@ -250,7 +254,7 @@ def test_structured_uses_forced_tool_backend_when_present():
             raise AssertionError("text path must not run")
     llm.set_backend(Forced())
     try:
-        from brain.plan import PLAN_SCHEMA, parse_plan
+        from brain.graph.plan import PLAN_SCHEMA, parse_plan
         out = llm.structured([{"role": "user", "content": "q"}], "s", PLAN_SCHEMA, name="classify")
         assert parse_plan(out).intent == "policy_question"
     finally:
@@ -263,7 +267,7 @@ def test_other_intent_sees_every_read_tool_and_no_write():
 
 
 def test_plan_schema_and_prompt_carry_the_lesson_rules():
-    from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA
+    from brain.graph.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA
     assert PLAN_SCHEMA["properties"]["intent"] and "first question" in CLASSIFY_SYSTEM
     assert "quoted from the Known facts" in CLASSIFY_SYSTEM
 
@@ -293,7 +297,7 @@ def test_reopened_topic_is_visible_again(scripted, hits, tmp_path):
 
 # ---- piece 3: typed handoff ----
 def _maya_then_ask(scripted, tmp_path, ask, thread, **plan_kw):
-    from brain.handoff import PendingWebexPort
+    from brain.webex.handoff import PendingWebexPort
     scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya Cohen"}}', '{"done":true}', "Maya is E001.")
     turn("E004", "Pull up Maya Cohen's record.", thread, tmp_path, "UG_HR")
     plan_kw.setdefault("subject_name", "Maya Cohen")
@@ -330,7 +334,7 @@ def test_hedged_or_quoted_ask_makes_no_handoff(scripted, tmp_path):
 
 
 def test_two_mayas_never_guessed(scripted, tmp_path):
-    from brain.handoff import PendingWebexPort
+    from brain.webex.handoff import PendingWebexPort
     scripted(plan("employee_lookup"), '{"tool":"get_employee","args":{"query":"Maya"}}', '{"done":true}', "Two Mayas.")
     turn("E004", "Who is Maya?", "t-h4", tmp_path, "UG_HR")  # returns Maya Cohen E001 and Maya Rosen E020
     scripted(plan("access_request", False, subject_name="Maya", system_name="Webex"), "ok")
@@ -377,7 +381,7 @@ def test_no_checklist_without_task_rows(scripted, hits, tmp_path):
 
 
 def test_evidence_shrink_keeps_every_source_whole():
-    from brain import evidence
+    from brain.graph import evidence
     rows = [{"source": f"documents/handbook/getting-started-{i}.md", "text": "word " * 400} for i in range(8)]
     out = evidence.evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
     assert all(r["source"] in out for r in rows)  # the old [:1500] cut a source in half
@@ -386,7 +390,7 @@ def test_evidence_shrink_keeps_every_source_whole():
 
 # ---- #19: nothing is cut silently; code enforces the lookups classify asked for ----
 def test_eight_whole_documents_reach_the_model_with_their_rule_text():
-    from brain import evidence
+    from brain.graph import evidence
     rows = [{"source": f"documents/policies/p{i}.md", "text": f"RULE-{i} " + "word " * 250} for i in range(8)]  # about 1300 chars each
     text, cut = evidence.render_evidence([{"tool": "search_documents", "args": {}, "result": rows}])
     assert cut == 0 and "truncated" not in text
@@ -395,7 +399,7 @@ def test_eight_whole_documents_reach_the_model_with_their_rule_text():
 
 
 def test_a_too_big_result_is_cut_visibly_and_every_source_survives():
-    from brain import evidence
+    from brain.graph import evidence
     rows = [{"source": f"documents/policies/p{i}.md", "text": "word " * 2000} for i in range(8)]
     text, cut = evidence.render_evidence([{"tool": "search_documents", "args": {}, "result": rows}])
     assert cut > 0 and text.count("[truncated") == 8 and all(r["source"] in text for r in rows)
@@ -403,7 +407,7 @@ def test_a_too_big_result_is_cut_visibly_and_every_source_survives():
 
 
 def test_evidence_budget_is_shared_so_a_big_result_does_not_starve_a_small_one():
-    from brain import evidence
+    from brain.graph import evidence
     big = [{"source": "documents/a.md", "text": "word " * 5000}]
     small = [{"source": "db:employees/E010", "full_name": "Rachel Stein"}]
     text, _ = evidence.render_evidence([{"tool": "search_documents", "args": {}, "result": big},
@@ -461,14 +465,14 @@ def test_a_bare_go_ahead_names_nobody_so_nothing_is_filed(scripted, tmp_path):
 
 
 def test_constraints_are_never_dropped_but_facts_are_capped():
-    from brain import graph
+    from brain.graph import graph
     rules = ["do not file until I say so"] + [f"rule {i}" for i in range(100)]
     assert "do not file until I say so" in graph._union([], rules, cap=None)
     assert len(graph._union([], [f"f{i}" for i in range(100)])) == graph.MAX_FACTS
 
 
 def test_checklist_never_mixes_two_employees():
-    from brain import checklist
+    from brain.answer import checklist
     row = lambda who, tid: {"source": f"db:onboarding_tasks/{tid}", "task_id": tid, "employee_id": who, "status": "planned",  # noqa: E731
                             "description": "Laptop"}
     ev = [{"tool": "list_onboarding_tasks", "args": {"employee_id": "E001"}, "result": [row("E001", "OT001")]},
@@ -515,7 +519,8 @@ def test_one_hung_tool_call_is_reported_in_the_answer_not_hidden(scripted, tmp_p
 
 
 def test_hung_graph_is_failed_by_the_turn_timeout(scripted, tmp_path, monkeypatch):
-    from brain import config, graph
+    from brain import config
+    from brain.graph import graph
     monkeypatch.setattr(config, "TURN_TIMEOUT_S", 0.2)
 
     async def hang(*a, **kw):
@@ -626,7 +631,7 @@ def test_answer_prompt_has_today_the_request_subject(scripted, hits, tmp_path): 
 
 # ---- batch B ----
 def test_clean_citations_keeps_real_sources_only():
-    from brain.claims import clean_citations
+    from brain.answer.claims import clean_citations
     t, d = clean_citations("Seats are 42 [db:software_subscriptions/SUB001] [1]. Freeze applies [Q3 SaaS freeze] [user instruction].",
                            {"db:software_subscriptions/SUB001"})
     assert t == "Seats are 42 [db:software_subscriptions/SUB001]. Freeze applies." and d == ["1", "Q3 SaaS freeze", "user instruction"]
@@ -635,7 +640,7 @@ def test_clean_citations_keeps_real_sources_only():
 
 
 def test_placeholder_subjects_mean_the_caller():
-    from brain.graph import _GENERIC_SUBJECT
+    from brain.graph.graph import _GENERIC_SUBJECT
     for s in ("unspecified", "[user's name not provided]", "unknown", "the user", "N/A"):
         assert _GENERIC_SUBJECT.search(s), s
     assert not _GENERIC_SUBJECT.search("Rachel Stein")
@@ -654,13 +659,13 @@ def test_a_mentioned_freeze_forces_one_memo_lookup(scripted, monkeypatch, tmp_pa
 
 
 def test_clean_citations_leaves_nested_brackets_whole():
-    from brain.claims import clean_citations
+    from brain.answer.claims import clean_citations
     t, d = clean_citations("Starts 2026-08-01 [onboarding_status: [db:employees/E001]].", {"db:employees/E001"})
     assert "]]" in t and "[db:employees/E001]" in t and d == []
 
 
 def test_a_failed_call_is_dropped_once_the_retry_succeeded():
-    from brain.evidence import live_evidence
+    from brain.graph.evidence import live_evidence
     ev = [{"tool": "search_documents", "args": {"corpus": ["x"]}, "result": "ERROR: search_documents failed (validation)"},
           {"tool": "get_employee", "args": {}, "result": "REJECTED: missing"},
           {"tool": "search_documents", "args": {"corpus": "x"}, "result": [{"source": "documents/a.md"}]}]
@@ -679,7 +684,7 @@ def test_subscription_rows_carry_comparisons_made_in_code():
 
 
 def test_a_first_name_matching_two_employees_asks_instead_of_guessing(scripted, hits, tmp_path):
-    from brain.evidence import ambiguous_first_name
+    from brain.graph.evidence import ambiguous_first_name
     ev = [{"tool": "get_employee", "args": {"query": "Daniel"}, "result": [
         {"employee_id": "E002", "full_name": "Daniel Levi"}, {"employee_id": "E017", "full_name": "Daniel Cohen"}]}]
     assert ambiguous_first_name(ev) == ("Daniel", [("E002", "Daniel Levi"), ("E017", "Daniel Cohen")])
@@ -709,7 +714,7 @@ MEMO = ("Memo: Saas Renewal Freeze Q3 Date: 2026-06-25 For Q3 2026, SaaS expansi
 
 
 def test_a_rule_is_read_from_the_memo_by_code_and_rendered_exactly():
-    from brain.rules import Rule, extract_rules
+    from brain.answer.rules import Rule, extract_rules
     ev = [{"tool": "search_documents", "args": {}, "result": [{"source": "documents/internal_memos/saas_renewal_freeze_q3.md", "text": MEMO}]}]
     (r,) = extract_rules(ev)
     assert r["threshold_usd"] == 7500 and r["needs"] == "Finance" and r["supersedes_usd"] == 5000
@@ -745,7 +750,7 @@ def test_wi02_check_accepts_the_wordings_seen_live():
 
 # ---- offline items from docs/GAPS-VS-COURSE.md ----
 def test_claims_get_the_source_of_an_id_the_evidence_holds():
-    from brain.claims import ground
+    from brain.answer.claims import ground
     allowed = {"db:access_requests/AR001", "db:employees/E010", "documents/policies/byod_policy.md"}
     text, typed = ground("AR001 is blocked. Rachel waits [db:employees/E010]. The policy needs MFA [documents/policies/byod_policy.md]. "
                          "There are 42 seats. Nothing was filed.", allowed)
@@ -757,7 +762,7 @@ def test_claims_get_the_source_of_an_id_the_evidence_holds():
 
 
 def test_memory_lines_come_from_durable_state_and_stop_when_released():
-    from brain.graph import memory_lines
+    from brain.graph.graph import memory_lines
     st = {"handoffs": {"k": {"system": "Webex", "subject_employee_id": "E001"}},
           "pending": {"AR001": {"approval_ids": ["AP001", "AP002"], "employee_id": "E001", "system": "Webex", "released": False}}}
     a, b = memory_lines(st)
@@ -777,7 +782,7 @@ def test_classify_sees_decisions_and_the_planned_query_drives_the_forced_search(
 
 
 def test_planner_rereads_only_a_capped_assistant_reply():
-    from brain.plan import classify_prompt
+    from brain.graph.plan import classify_prompt
     long = "x" * 900
     body = classify_prompt([{"role": "user", "content": "q" * 900}, {"role": "assistant", "content": long}], "next", [], [])[0]["content"]
     assert "x" * 400 + " ...[cut]" in body and "x" * 401 not in body and "q" * 900 in body
@@ -801,7 +806,7 @@ def test_a_failed_freeze_search_is_tried_again_next_turn(scripted, monkeypatch, 
 
 
 def test_a_first_name_the_model_resolved_by_full_name_does_not_ask():
-    from brain.evidence import ambiguous_first_name
+    from brain.graph.evidence import ambiguous_first_name
     two = {"tool": "get_employee", "args": {"query": "Daniel"}, "result": [
         {"employee_id": "E002", "full_name": "Daniel Levi"}, {"employee_id": "E017", "full_name": "Daniel Cohen"}]}
     one = {"tool": "get_employee", "args": {"query": "Daniel Levi"}, "result": [{"employee_id": "E002", "full_name": "Daniel Levi"}]}
@@ -812,7 +817,7 @@ def test_a_first_name_the_model_resolved_by_full_name_does_not_ask():
 
 
 def test_clean_citations_keeps_every_real_source_shape():
-    from brain.claims import clean_citations
+    from brain.answer.claims import clean_citations
     allowed = {"db:tickets/T001", "db:software_subscriptions/SUB001", "documents/policies/byod_policy.md", "documents/it_kb/webex_login_issue.md"}
     text = ("T001 is open [db:tickets/T001]. Seats are 42 [db:software_subscriptions/SUB001]. MFA [documents/policies/byod_policy.md]. "
             "Login [documents/it_kb/webex_login_issue.md#steps]. Made up [documents/policies/none.md] and [1].")
@@ -823,7 +828,7 @@ def test_clean_citations_keeps_every_real_source_shape():
 
 
 def test_rule_extraction_survives_a_reworded_memo_and_ignores_a_different_one():
-    from brain.rules import extract_rules
+    from brain.answer.rules import extract_rules
     src = "documents/internal_memos/saas_renewal_freeze_q3.md"
     worded = ("Memo Q3 freeze. SaaS expansions over $7,500 a year need Finance sign-off. "
               "This replaces the older $5,000 threshold in the procurement policy.")

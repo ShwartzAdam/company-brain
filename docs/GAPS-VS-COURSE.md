@@ -57,7 +57,7 @@ Course habits that would have cut it: one session first, repeats only for the tu
 4. Gap 4: cap tool results in the planner view at 400 characters. Small, offline-testable.
 
 ## G. Offline work done after this note (unit tests only, not measured live)
-- Gap 5: `brain/claims.py` types the answer as claims with sources; ids the evidence holds are cited by code; uncited numbers are listed.
+- Gap 5: `brain/answer/claims.py` types the answer as claims with sources; ids the evidence holds are cited by code; uncited numbers are listed.
   The answer is still free text from the model, not a structured model output.
 - Gap 2: `memory_lines()` writes "Decision" and "Unresolved" lines from handoffs and pending approvals (code, recomputed each turn).
   Not stored as facts; no distil node.

@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from session_replay import AS_OF, RESULTS, has  # noqa: E402
 
-from brain.scope import WRITE_TOOLS  # noqa: E402
+from brain.graph.scope import WRITE_TOOLS  # noqa: E402
 
 S2, S3, S4, S9 = "S2-onboarding-maya", "S3-intent-shift", "S4-constraint-carry", "S9-maya-own-account"
 DATE = "2026-08-01|August 1|Aug 1|1 August"

@@ -27,7 +27,7 @@ Read from the lesson docs (lessons 2, 3, 5-13) and the lesson 10 code. `ai-cours
 - **More raw context made recall worse** in two separate L12 runs (longer tool output, three verbatim turns). Do not widen context to fix recall.
 - Memory is named fields (facts, constraints, decisions, unresolved), not a summary string. Never silently drop a constraint. A rejected memory keeps the raw history. Memory values are a snapshot: "what is it now" needs a tool.
 - Lesson's own result: distillation saves tokens (-12%) but strict task success was lower than the baseline. Treat it as a trade.
-- **Status:** facts are written by code from tool rows (`row_facts` in `brain/evidence.py`), never from the model's prose; classify takes facts and constraints from the user's words only. Facts and constraints still only grow (cap 30). Closed topics drop their rows (`closes_topic`), the freeze rule is a typed `Rule`, and decisions and unresolved work are lines written by code from handoffs and pending approvals (`memory_lines`). There is still no distil node and no `memory.py`.
+- **Status:** facts are written by code from tool rows (`row_facts` in `brain/graph/evidence.py`), never from the model's prose; classify takes facts and constraints from the user's words only. Facts and constraints still only grow (cap 30). Closed topics drop their rows (`closes_topic`), the freeze rule is a typed `Rule`, and decisions and unresolved work are lines written by code from handoffs and pending approvals (`memory_lines`). There is still no distil node and no `memory.py`.
 
 ## 5. Retrieval (L6, L7)
 - Access control is a **metadata filter at retrieval**, from the caller's role, never a refusal after the fact.

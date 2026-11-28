@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import checks  # noqa: E402
 from brain import config  # noqa: E402
-from brain.scope import WRITE_TOOLS  # noqa: E402
+from brain.graph.scope import WRITE_TOOLS  # noqa: E402
 
 AS_OF = "2026-07-01T12:00:00Z"
 RESULTS = Path(__file__).resolve().parent / "results"

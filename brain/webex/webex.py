@@ -7,9 +7,9 @@ from typing import Literal
 from langfuse import get_client
 from pydantic import BaseModel, Field, model_validator
 
-from brain import gate
-from brain.handoff import PendingAccessResult, WebexHandoff
-from brain.status import _GRANT, STATUSES
+from brain.webex import gate
+from brain.webex.handoff import PendingAccessResult, WebexHandoff
+from brain.answer.status import _GRANT, STATUSES
 
 
 class Fact(BaseModel):

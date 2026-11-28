@@ -6,9 +6,11 @@ from dataclasses import dataclass, field
 
 from langfuse import get_client, observe, propagate_attributes
 
-from brain import config, graph, mcp_client
-from brain.webex import WebexWorkflow, release_pending  # noqa: F401
-from brain.scope import WRITE_TOOLS
+from brain import config, mcp_client
+
+from brain.graph import graph
+from brain.webex.webex import WebexWorkflow, release_pending  # noqa: F401
+from brain.graph.scope import WRITE_TOOLS
 
 
 @dataclass

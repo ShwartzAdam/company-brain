@@ -28,7 +28,9 @@ import session_replay as sr  # noqa: E402
 import webex_checks as wc  # noqa: E402
 import judge  # noqa: E402
 
-from brain import agent, config, gate  # noqa: E402
+from brain import agent, config  # noqa: E402
+
+from brain.webex import gate
 
 from server import db
 

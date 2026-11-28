@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from brain import llm  # noqa: E402
-from brain.status import answer_agrees  # noqa: E402
+from brain.answer.status import answer_agrees  # noqa: E402
 
 SCHEMA = {"type": "object", "required": ["score", "reasoning"],
           "properties": {"score": {"type": "number", "minimum": 0, "maximum": 1},

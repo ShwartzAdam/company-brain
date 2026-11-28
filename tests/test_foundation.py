@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from brain import gate
+from brain.webex import gate
 
 from server import db, ingest, people, retrieval, tools
 

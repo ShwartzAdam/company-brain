@@ -13,8 +13,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from brain.scope import WRITE_TOOLS  # noqa: E402
-from brain.status import STATUSES, answer_agrees  # noqa: E402
+from brain.graph.scope import WRITE_TOOLS  # noqa: E402
+from brain.answer.status import STATUSES, answer_agrees  # noqa: E402
 
 ROOT_KEYS = ("caller_id", "caller_group", "request_id", "as_of", "case_id", "turn", "scope", "intent",
              "visible_tools", "tool_sequence", "status")

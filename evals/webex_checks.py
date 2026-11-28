@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from brain.status import STATUSES, answer_agrees  # noqa: E402
+from brain.answer.status import STATUSES, answer_agrees  # noqa: E402
 
 BUSINESS = ("tickets", "access_requests", "approvals")
 

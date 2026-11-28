@@ -1,6 +1,6 @@
 # Lessons learned (Step 2 and Step 3 prep)
 
-Plain language. Read this before editing `brain/graph.py`, `brain/scope.py`, `server/tools.py`, `brain/llm.py`, `brain/plan.py`.
+Plain language. Read this before editing `brain/graph/graph.py`, `brain/graph/scope.py`, `server/tools.py`, `brain/llm.py`, `brain/graph/plan.py`.
 Design reference: `BEST-PRACTICES.md` (from the ai-course lessons).
 
 ## What went wrong
