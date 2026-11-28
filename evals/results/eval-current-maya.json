@@ -1,0 +1,25 @@
+{
+ "carry": [
+  "S2-onboarding-maya t9: missing '7,500|7500' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t9: missing '18,400|18400' (turn-1 freeze + memo threshold + Webex cost)",
+  "S2-onboarding-maya t12: missing 'Israel' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S2-onboarding-maya t12: missing 'Finance' (summary: turn-1 facts, turn-9 Finance, turn-10 handoff)",
+  "S4-constraint-carry t8: missing 'Finance' (turn-1 threshold still flagged when the user lifts the filing rule)",
+  "S4-constraint-carry t8: missing '7,500|7500' (turn-1 threshold still flagged when the user lifts the filing rule)"
+ ],
+ "closed": [],
+ "citations": [
+  "S9-maya-own-account t3: tool-backed answer cites nothing",
+  "S4-constraint-carry t1: tool-backed answer cites nothing"
+ ],
+ "writes": [],
+ "handoff": [],
+ "restart": [],
+ "arguments": [],
+ "faithful": [
+  "S9-maya-own-account t2: faithfulness 0.50, unsupported ['To be eligible, you generally need at least six months in your current role, sustained performance at your current level, and evidence that you are already operating at the next level in important ways.', 'A Customer Success Manager such as Maya Cohen may become S3 when she can own customer health and complex support outcomes, not merely when she has many customer meetings.']",
+  "S9-maya-own-account t3: faithfulness 0.75, unsupported ['Once your BambooHR self-service profile is completed and your equipment responsibility form is signed, your manager or IT can assign the necessary software licenses for you.']",
+  "S9-maya-own-account t4: faithfulness 0.75, unsupported ['How do I get my software licenses sorted?']",
+  "S9-maya-own-account t5: faithfulness 0.75, unsupported ['The assistant did not provide the full career path details for CSM as the search returned incomplete results', \"The assistant did not confirm whether the laptop will arrive before the employee's start date (1st)\"]"
+ ]
+}
