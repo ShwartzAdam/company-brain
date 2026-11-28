@@ -377,36 +377,36 @@ def test_no_checklist_without_task_rows(scripted, hits, tmp_path):
 
 
 def test_evidence_shrink_keeps_every_source_whole():
-    from brain import graph
+    from brain import evidence
     rows = [{"source": f"documents/handbook/getting-started-{i}.md", "text": "word " * 400} for i in range(8)]
-    out = graph._evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
+    out = evidence.evidence_text([{"tool": "search_documents", "args": {}, "result": rows}])
     assert all(r["source"] in out for r in rows)  # the old [:1500] cut a source in half
-    assert len(out) < graph.EVIDENCE_CHARS + 600
+    assert len(out) < evidence.EVIDENCE_CHARS + 600
 
 
 # ---- #19: nothing is cut silently; code enforces the lookups classify asked for ----
 def test_eight_whole_documents_reach_the_model_with_their_rule_text():
-    from brain import graph
+    from brain import evidence
     rows = [{"source": f"documents/policies/p{i}.md", "text": f"RULE-{i} " + "word " * 250} for i in range(8)]  # about 1300 chars each
-    text, cut = graph._evidence([{"tool": "search_documents", "args": {}, "result": rows}])
+    text, cut = evidence.render_evidence([{"tool": "search_documents", "args": {}, "result": rows}])
     assert cut == 0 and "truncated" not in text
     assert all(f"RULE-{i}" in text and r["source"] in text for i, r in enumerate(rows))
     assert text.count("word") >= 8 * 250  # the old cap kept 120 characters of each
 
 
 def test_a_too_big_result_is_cut_visibly_and_every_source_survives():
-    from brain import graph
+    from brain import evidence
     rows = [{"source": f"documents/policies/p{i}.md", "text": "word " * 2000} for i in range(8)]
-    text, cut = graph._evidence([{"tool": "search_documents", "args": {}, "result": rows}])
+    text, cut = evidence.render_evidence([{"tool": "search_documents", "args": {}, "result": rows}])
     assert cut > 0 and text.count("[truncated") == 8 and all(r["source"] in text for r in rows)
-    assert len(text) < graph.EVIDENCE_CHARS + 1500
+    assert len(text) < evidence.EVIDENCE_CHARS + 1500
 
 
 def test_evidence_budget_is_shared_so_a_big_result_does_not_starve_a_small_one():
-    from brain import graph
+    from brain import evidence
     big = [{"source": "documents/a.md", "text": "word " * 5000}]
     small = [{"source": "db:employees/E010", "full_name": "Rachel Stein"}]
-    text, _ = graph._evidence([{"tool": "search_documents", "args": {}, "result": big},
+    text, _ = evidence.render_evidence([{"tool": "search_documents", "args": {}, "result": big},
                                {"tool": "get_employee", "args": {}, "result": small}])
     assert "Rachel Stein" in text and "db:employees/E010" in text
 
@@ -626,7 +626,7 @@ def test_answer_prompt_has_today_the_request_subject(scripted, hits, tmp_path): 
 
 # ---- batch B ----
 def test_clean_citations_keeps_real_sources_only():
-    from brain.graph import clean_citations
+    from brain.claims import clean_citations
     t, d = clean_citations("Seats are 42 [db:software_subscriptions/SUB001] [1]. Freeze applies [Q3 SaaS freeze] [user instruction].",
                            {"db:software_subscriptions/SUB001"})
     assert t == "Seats are 42 [db:software_subscriptions/SUB001]. Freeze applies." and d == ["1", "Q3 SaaS freeze", "user instruction"]
@@ -654,13 +654,13 @@ def test_a_mentioned_freeze_forces_one_memo_lookup(scripted, monkeypatch, tmp_pa
 
 
 def test_clean_citations_leaves_nested_brackets_whole():
-    from brain.graph import clean_citations
+    from brain.claims import clean_citations
     t, d = clean_citations("Starts 2026-08-01 [onboarding_status: [db:employees/E001]].", {"db:employees/E001"})
     assert "]]" in t and "[db:employees/E001]" in t and d == []
 
 
 def test_a_failed_call_is_dropped_once_the_retry_succeeded():
-    from brain.graph import live_evidence
+    from brain.evidence import live_evidence
     ev = [{"tool": "search_documents", "args": {"corpus": ["x"]}, "result": "ERROR: search_documents failed (validation)"},
           {"tool": "get_employee", "args": {}, "result": "REJECTED: missing"},
           {"tool": "search_documents", "args": {"corpus": "x"}, "result": [{"source": "documents/a.md"}]}]
@@ -679,7 +679,7 @@ def test_subscription_rows_carry_comparisons_made_in_code():
 
 
 def test_a_first_name_matching_two_employees_asks_instead_of_guessing(scripted, hits, tmp_path):
-    from brain.graph import ambiguous_first_name
+    from brain.evidence import ambiguous_first_name
     ev = [{"tool": "get_employee", "args": {"query": "Daniel"}, "result": [
         {"employee_id": "E002", "full_name": "Daniel Levi"}, {"employee_id": "E017", "full_name": "Daniel Cohen"}]}]
     assert ambiguous_first_name(ev) == ("Daniel", [("E002", "Daniel Levi"), ("E017", "Daniel Cohen")])
@@ -801,7 +801,7 @@ def test_a_failed_freeze_search_is_tried_again_next_turn(scripted, monkeypatch, 
 
 
 def test_a_first_name_the_model_resolved_by_full_name_does_not_ask():
-    from brain.graph import ambiguous_first_name
+    from brain.evidence import ambiguous_first_name
     two = {"tool": "get_employee", "args": {"query": "Daniel"}, "result": [
         {"employee_id": "E002", "full_name": "Daniel Levi"}, {"employee_id": "E017", "full_name": "Daniel Cohen"}]}
     one = {"tool": "get_employee", "args": {"query": "Daniel Levi"}, "result": [{"employee_id": "E002", "full_name": "Daniel Levi"}]}
@@ -812,7 +812,7 @@ def test_a_first_name_the_model_resolved_by_full_name_does_not_ask():
 
 
 def test_clean_citations_keeps_every_real_source_shape():
-    from brain.graph import clean_citations
+    from brain.claims import clean_citations
     allowed = {"db:tickets/T001", "db:software_subscriptions/SUB001", "documents/policies/byod_policy.md", "documents/it_kb/webex_login_issue.md"}
     text = ("T001 is open [db:tickets/T001]. Seats are 42 [db:software_subscriptions/SUB001]. MFA [documents/policies/byod_policy.md]. "
             "Login [documents/it_kb/webex_login_issue.md#steps]. Made up [documents/policies/none.md] and [1].")

@@ -1,7 +1,6 @@
 """classify -> scope -> gather -> answer, on LangGraph with a SQLite checkpointer.
 Adapted from lesson-10 02-dynamic-tool-loadout/graph.py. The graph reaches tools only through the
 Toolbox (MCP); it never touches the database. Model calls only through llm.complete."""
-import json
 import operator
 import re
 from typing import Annotated, TypedDict
@@ -10,11 +9,14 @@ from langfuse import get_client, observe
 from langgraph.types import interrupt
 
 from brain import checklist, gate, llm
-from brain.claims import ground
+from brain.claims import clean_citations, ground
+from brain.evidence import (ambiguous_first_name, evidence_text, live_evidence, render_evidence,
+                            row_facts, sources_of)
 from brain.handoff import WebexHandoff, make_key
+from brain.prompts import ANSWER_SYSTEM, GATHER_SYSTEM
 from brain.plan import CLASSIFY_SYSTEM, PLAN_SCHEMA, TurnPlan, classify_prompt, parse_plan, render, window
 from brain.rules import Rule, extract_rules
-from brain.scope import LOADOUTS, READ_TOOLS, WRITE_TOOLS, select_tools, widen_reads
+from brain.scope import LOADOUTS, WRITE_TOOLS, select_tools, widen_reads
 from brain.status import answer_agrees, claims_done, final_status
 from brain.webex import AccessDecision, release_pending
 
@@ -126,18 +128,6 @@ async def scope(state: State, config) -> dict:
     return {"scope": scope_name, "visible": visible}
 
 
-GATHER_SYSTEM = (
-    "You gather evidence for a NovaOps assistant. Reply with ONLY one JSON object:\n"
-    '  {{"tool": "<name>", "args": {{...}}}}  to call a visible tool, or  {{"done": true}}  when you have enough.\n'
-    "Visible tools this turn (no others exist for you):\n{tools}\n"
-    "Rules: do not repeat a call that already has a result; use employee ids from results, never guess them; "
-    "'she/he/her/him/they' means the person named in the conversation, NEVER the caller: look that person up by full name and use their id; "
-    "looking up who someone is does NOT answer a question about their tickets, tasks or assets: call that records tool with the id before done; "
-    "stop with done as soon as the question can be answered. Never call anything to file or approve.")
-
-
-EVIDENCE_CHARS = 12000  # the whole evidence block. 8 whole-document results are about 1400 characters each
-MIN_ITEM_CHARS = 1500   # no single result is squeezed below this, however many there are
 _DOC_WORDS = re.compile(r"polic|rule|threshold|handbook|document|memo|article|eligib|guideline|procedure|contract term|"
                         r"letter|addendum|agreement|summary|statement of work|profile|\boffer\b|\bform\b", re.I)
 _PRONOUN = re.compile(r"\b(her|his|she|he|their|they|them)\b", re.I)
@@ -155,54 +145,6 @@ def _search_query(state) -> str:
     return f"{names[-1]} {q}" if names and _PRONOUN.search(q) else q
 
 
-def _shrink(result, limit: int = EVIDENCE_CHARS):
-    """-> (result, chars_cut). Cap a tool result near `limit` characters by shortening each row's `text`, never by
-    cutting the JSON string (a cut string once ended mid-`source` and the model cited '[documents/handbook/getting-.]').
-    A shortened row ends with a marker, so the model knows the text is partial."""
-    if isinstance(result, str):
-        return (result, 0) if len(result) <= limit else (result[:limit] + " ...[truncated]", len(result) - limit)
-    if not isinstance(result, list) or len(json.dumps(result)) <= limit:
-        return result, 0
-    rows = [r for r in result if isinstance(r, dict) and isinstance(r.get("text"), str)]
-    if not rows:
-        return result, 0
-    room = limit - (len(json.dumps(result)) - sum(len(r["text"]) for r in rows))
-    cap = max(120, room // len(rows))
-    cut, out = 0, []
-    for r in result:
-        if isinstance(r, dict) and isinstance(r.get("text"), str) and len(r["text"]) > cap:
-            cut += len(r["text"]) - cap
-            r = {**r, "text": r["text"][:cap] + f" ...[truncated, {len(r['text']) - cap} more characters]"}
-        out.append(r)
-    return out, cut
-
-
-def _evidence(ev: list) -> tuple[str, int]:
-    """-> (prompt text, characters cut). One budget for the whole block, shared between the results."""
-    each = max(MIN_ITEM_CHARS, EVIDENCE_CHARS // max(1, len(ev)))
-    lines, cut = [], 0
-    for i, e in enumerate(ev, 1):
-        res, c = _shrink(e["result"], each)
-        cut += c
-        lines.append(f"[{i}] {e['tool']}({json.dumps(e['args'])}) -> {json.dumps(res)}")
-    return "\n".join(lines) or "(none yet)", cut
-
-
-def ambiguous_first_name(ev: list):
-    """(name, [(id, full name)...]) when a one-word get_employee query matched more than one employee, else None."""
-    for i, e in enumerate(ev):
-        q = str((e.get("args") or {}).get("query", "")).strip()
-        rows = [r for r in (e["result"] if isinstance(e["result"], list) else []) if isinstance(r, dict) and r.get("employee_id")]
-        if e["tool"] == "get_employee" and q and " " not in q and not re.fullmatch(r"E\d+|\S+@\S+", q) and len(rows) > 1:
-            ids = {r["employee_id"] for r in rows}
-            if any(x["tool"] == "get_employee" and len(found := [r for r in (x["result"] if isinstance(x["result"], list) else [])
-                                                                  if isinstance(r, dict) and r.get("employee_id")]) == 1
-                   and found[0]["employee_id"] in ids for x in ev[i + 1:]):
-                continue  # a later lookup returned exactly one of the ambiguous people: the model resolved it from the conversation
-            return q, [(r["employee_id"], r["full_name"]) for r in rows]
-    return None
-
-
 def _rule_lines(state) -> list[str]:
     return [Rule(**r).render() for r in state.get("rules") or []]
 
@@ -214,25 +156,6 @@ def memory_lines(state) -> list[str]:
            f"workflow; it is pending, not filed, approved or granted." for h in (state.get("handoffs") or {}).values()]
     out += [f"Unresolved: approvals {', '.join(p.get('approval_ids') or [])} for {p['employee_id']} ({p['system']}) are still waiting."
             for p in (state.get("pending") or {}).values() if not p.get("released")]
-    return out
-
-
-def live_evidence(ev: list) -> list:
-    """A failed or rejected call is dropped once a later call of the same tool returned a result: the answer must not
-    say 'could not look it up' about something the retry found."""
-    bad = lambda e: isinstance(e["result"], str) and e["result"].startswith(("ERROR:", "REJECTED:"))  # noqa: E731
-    return [e for i, e in enumerate(ev) if not (bad(e) and any(x["tool"] == e["tool"] and not bad(x) for x in ev[i + 1:]))]
-
-
-def _evidence_text(ev: list) -> str:
-    return _evidence(ev)[0]
-
-
-def _sources(result) -> list[str]:
-    out = []
-    for part in result if isinstance(result, list) else [result]:
-        if isinstance(part, dict) and part.get("source"):
-            out.append(part["source"])
     return out
 
 
@@ -249,7 +172,7 @@ async def gather(state: State, config) -> dict:
                 f"Constraints: {state.get('constraints')}\nFacts: {state.get('facts')}\n"
                 f"Recent conversation:\n{render(_window(state))}\n\n"
                 f"Newest message:\n{state['message']}\n\nLookups this question needs: {needed or '(not listed)'}\n"
-                f"Suggested document search phrase: {(state['plan'].get('search_query') or '(none)')}\n\nEvidence so far:\n{_evidence_text(ev)}")
+                f"Suggested document search phrase: {(state['plan'].get('search_query') or '(none)')}\n\nEvidence so far:\n{evidence_text(ev)}")
         schema = {"type": "object", "properties": {"tool": {"type": "string", "enum": list(visible)},
                                                    "args": {"type": "object"}, "done": {"type": "boolean"}}}
         try:
@@ -292,7 +215,7 @@ async def gather(state: State, config) -> dict:
                 error = f"{name} failed: {e}"
                 break
             continue
-        found = _sources(res)
+        found = sources_of(res)
         log.append({"tool": name, "args": args})
         ev.append({"tool": name, "args": args, "result": res})
         srcs += found
@@ -308,7 +231,7 @@ async def gather(state: State, config) -> dict:
             res = await box.call("search_documents", args)
             log.append({"tool": "search_documents", "args": args})
             ev.append({"tool": "search_documents", "args": args, "result": res})
-            srcs += _sources(res)
+            srcs += sources_of(res)
         except Exception as e:  # noqa: BLE001
             fallbacks.append("tool_failed:search_documents")
             log.append({"tool": "search_documents", "args": args, "failed": True})
@@ -320,7 +243,7 @@ async def gather(state: State, config) -> dict:
             res = await box.call("search_documents", args)
             log.append({"tool": "search_documents", "args": args})
             ev.append({"tool": "search_documents", "args": args, "result": res})
-            srcs += _sources(res)
+            srcs += sources_of(res)
         except Exception as e:  # noqa: BLE001  the memo lookup failing must not fail the whole turn
             fallbacks.append("tool_failed:search_documents")
             log.append({"tool": "search_documents", "args": args, "failed": True})
@@ -331,7 +254,7 @@ async def gather(state: State, config) -> dict:
             res = await box.call("search_documents", args)
             log.append({"tool": "search_documents", "args": args})
             ev.append({"tool": "search_documents", "args": args, "result": res})
-            srcs += _sources(res)
+            srcs += sources_of(res)
         except Exception as e:  # noqa: BLE001  a missing helper search must not fail the whole turn
             fallbacks.append("tool_failed:search_documents(it_kb)")
             log.append({"tool": "search_documents", "args": args, "failed": True})
@@ -442,45 +365,6 @@ async def handoff(state: State, config) -> dict:
             "pause_now": pause_now, "decision": dec, "evidence": ev, "sources": srcs}
 
 
-ANSWER_SYSTEM = (
-    "You are the NovaOps internal assistant. Answer the user's CURRENT request from the evidence and the "
-    "established facts only; never invent an employee, number or rule. Cite every claim by the exact `source` string of the evidence row, in brackets, for example "
-    "[documents/policies/byod_policy.md] or [db:onboarding_tasks/OT005]. Never use numbered citations like [1], and never cite a source that is not in the evidence. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
-    "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
-    "request to file something, say it has NOT been filed and what would be needed. If you could not look "
-    "something up, say so. Flags in the rows (over_limit, annual_cost_above_threshold, seats_available) were computed by code: use them as given, never compare numbers yourself. annual_cost_above_threshold compares the WHOLE contract cost with the approval threshold; for adding seats use expansion_cost and expansion_above_threshold (computed by code from seats_to_add), never the contract total. If a seat question has no expansion_above_threshold, say how many seats are being added is needed; do not work it out yourself. Below the threshold only means the Q3 memo does not add an approval; other documents in the evidence may still require one. At most six sentences. Terminal status of this turn: {status}.")
-
-
-def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tuple[str, list]:
-    """[n] is the model pointing at the n-th evidence row printed in its prompt: it becomes that row's real sources.
-    Any other bracket that is not a source in this turn's evidence or facts ([constraints], [user instruction]) is removed."""
-    for n, srcs in (numbered or {}).items():
-        text = text.replace(f"[{n}]", "".join(f"[{x}]" for x in srcs))
-    dropped = [b for b in re.findall(r"\[([^\[\]]+)\]", text) if b not in allowed and b.split("#")[0].strip() not in allowed]  # innermost brackets only
-    for b in dropped:
-        text = text.replace(f"[{b}]", "")
-    return re.sub(r"\s+([.,;])", r"\1", re.sub(r" {2,}", " ", text)).strip(), dropped
-
-
-def _row_facts(evidence: list) -> list[str]:
-    """Memory of what the tools returned, written by code: one compact line per database row. Never the
-    model's own prose, so a wrong sentence cannot become a fact. (Top document passages are kept too, so a follow-up needs no new search.)"""
-    out = []
-    for e in evidence:
-        docs = 0
-        for part in e["result"] if isinstance(e["result"], list) else []:
-            if not isinstance(part, dict):
-                continue
-            src = str(part.get("source", ""))
-            if src.startswith("db:"):
-                body = ", ".join(f"{k}={v}" for k, v in part.items() if k != "source" and v not in (None, ""))
-                out.append(f"[{src}] {body}"[:240])
-            elif src.startswith("documents/") and part.get("text") and docs < 3:  # top passages, so follow-ups need no new search
-                docs += 1
-                out.append(f"[{src}] {part.get('section', '')}: {' '.join(part['text'].split())[:300]}")
-    return out
-
-
 @_node("answer")
 async def answer(state: State, config) -> dict:
     plan = TurnPlan(**state["plan"])
@@ -499,7 +383,7 @@ async def answer(state: State, config) -> dict:
     elif status == "failed":
         text = f"I could not complete this: {state['error']}."
     else:
-        ev_text, cut = _evidence(evid)
+        ev_text, cut = render_evidence(evid)
         if cut:
             fallbacks.append("evidence_truncated")
             get_client().update_current_span(level="WARNING", status_message=f"evidence shortened by {cut} characters")
@@ -520,7 +404,7 @@ async def answer(state: State, config) -> dict:
         allowed = set(state.get("sources") or []) | set(re.findall(r"\[((?:db:|documents/)[^\]]+)\]", " ".join(state.get("facts") or [])))
         allowed |= {str(p["source"]) for e in evid for p in (e["result"] if isinstance(e["result"], list) else [])
                     if isinstance(p, dict) and p.get("source")}
-        numbered = {str(i): list(dict.fromkeys(_sources(e["result"])))[:3] for i, e in enumerate(evid, 1)}
+        numbered = {str(i): list(dict.fromkeys(sources_of(e["result"])))[:3] for i, e in enumerate(evid, 1)}
         text, dropped = clean_citations(text, allowed, numbered)
         if dropped:
             _meta(citations_dropped=dropped)
@@ -546,8 +430,8 @@ async def answer(state: State, config) -> dict:
     _io({"evidence_items": len(evid), "handoff": bool(h)}, {"answer": text[:400], "status": status})
     # The assistant's own sentences are never stored as facts: facts come from the user's words only.
     cl = checklist.build(evid)
-    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [*(FREEZE_NOTE for _ in [0] if any("saas_renewal_freeze" in x for e in evid for x in _sources(e["result"]))),
-                                                  *(f"{plan.intent}: {f}" for f in _row_facts(evid))]), "rules": state["rules"],
+    return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [*(FREEZE_NOTE for _ in [0] if any("saas_renewal_freeze" in x for e in evid for x in sources_of(e["result"]))),
+                                                  *(f"{plan.intent}: {f}" for f in row_facts(evid))]), "rules": state["rules"],
             "messages": [{"role": "user", "content": state["message"], "intent": plan.intent},
                          {"role": "assistant", "content": text, "intent": plan.intent}]}
 
