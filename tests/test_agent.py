@@ -619,6 +619,8 @@ def test_clean_citations_keeps_real_sources_only():
     t, d = clean_citations("Seats are 42 [db:software_subscriptions/SUB001] [1]. Freeze applies [Q3 SaaS freeze] [user instruction].",
                            {"db:software_subscriptions/SUB001"})
     assert t == "Seats are 42 [db:software_subscriptions/SUB001]. Freeze applies." and d == ["1", "Q3 SaaS freeze", "user instruction"]
+    t, d = clean_citations("Seats are 42 [1].", {"db:software_subscriptions/SUB001"}, {"1": ["db:software_subscriptions/SUB001"]})
+    assert t == "Seats are 42 [db:software_subscriptions/SUB001]." and d == []
 
 
 def test_placeholder_subjects_mean_the_caller():

@@ -396,8 +396,11 @@ ANSWER_SYSTEM = (
     "something up, say so. At most six sentences. Terminal status of this turn: {status}.")
 
 
-def clean_citations(text: str, allowed: set) -> tuple[str, list]:
-    """Brackets that are not a source in this turn's evidence or facts ([1], [constraints], [user instruction]) are removed."""
+def clean_citations(text: str, allowed: set, numbered: dict | None = None) -> tuple[str, list]:
+    """[n] is the model pointing at the n-th evidence row printed in its prompt: it becomes that row's real sources.
+    Any other bracket that is not a source in this turn's evidence or facts ([constraints], [user instruction]) is removed."""
+    for n, srcs in (numbered or {}).items():
+        text = text.replace(f"[{n}]", "".join(f"[{x}]" for x in srcs))
     dropped = [b for b in re.findall(r"\[([^\]]+)\]", text) if b not in allowed]
     for b in dropped:
         text = text.replace(f"[{b}]", "")
@@ -452,7 +455,8 @@ async def answer(state: State, config) -> dict:
         allowed = set(state.get("sources") or []) | set(re.findall(r"\[((?:db:|documents/)[^\]]+)\]", " ".join(state.get("facts") or [])))
         allowed |= {str(p.get("source")) for e in state["evidence"] for p in (e["result"] if isinstance(e["result"], list) else [])
                     if isinstance(p, dict)}
-        text, dropped = clean_citations(text, allowed)
+        numbered = {str(i): list(dict.fromkeys(_sources(e["result"])))[:3] for i, e in enumerate(state["evidence"], 1)}
+        text, dropped = clean_citations(text, allowed, numbered)
         if dropped:
             _meta(citations_dropped=dropped)
     h = state.get("handoff")
