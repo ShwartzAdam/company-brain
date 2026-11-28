@@ -1,0 +1,988 @@
+{
+ "S1-quick-policy": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "1b5cb88029952f9d1bc719705384b138"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "6e2fc4d742f5b17b3dc5b88cc6aa190e"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "e964c61521fabf0df043095eb18bcf92"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 0.0,
+    "tool_selection": 0.0
+   },
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "78f869c2fcaf4babdfb16f3c6ae60e4f"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "eba53984c4d9cdd3769d8582d377f317"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "0873bce0fc8aca5206ea4db17e295af9"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "eca1b641e200b86856b03eef7dccf562"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "3dd4ae32bd06863e8ee30eaffff0bb45"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "b0011074b8dd521f7d77614df7d16559"
+    }
+   ],
+   "fails": [
+    "tool use True != False"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 0.0
+   },
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "35efe6ccb8f26f06faf819ab585794b3"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "7fa9e5920812cd0433ad9f8dec313c67"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "2b84d2412bfd3a919e71698c08d55379"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "intent_accuracy": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S3-intent-shift": {
+  "1": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.3333333333333333,
+      "tool_selection": 0.0
+     },
+     "trace_id": "bcd99179ddfa56d62e8c40d38c61c551"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.3333333333333333,
+      "tool_selection": 0.0
+     },
+     "trace_id": "f2531953524b2c6a04c4c26b8a546198"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.3333333333333333,
+      "tool_selection": 0.0
+     },
+     "trace_id": "a380181e80dd393c28b6746b2b41904a"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 0.33,
+    "tool_selection": 0.0
+   },
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "list_access_requests",
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "ebdfcf4011fea6cdee96adb105042ef4"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "d5ae298591db878b8dcf9abc2857f2c8"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "888a7cb7012c865afddff6cd0db194a8"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "status": "completed",
+   "tools": [
+    "list_employee_tickets",
+    "list_employee_tickets"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "f4d357949266290b19e0e6a5a0c21a9c"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "25ff87f841b927c3c311592c7850c895"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "a18bbe42c4c2bce23cb16157fc2c3a0c"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "forbidden_avoided": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "6075620814b3673e8ca871798bbaa945"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "a76be6814a7f07ce21ceb8b5a5216373"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "3f19a4633fea90f488f2bac494f7acd9"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "status": "completed",
+   "tools": [
+    "get_employee"
+   ]
+  },
+  "5": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "487051bef2ced74946dc435356b5dd70"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "06643056d8e9a633006ca9bcfda5103b"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "a456d84988facc9202a18ccbd5ca8b97"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "status": "completed",
+   "tools": [
+    "list_employee_tickets"
+   ]
+  },
+  "6": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "e541bd73b180fa04923c95156ae7b061"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "aa1ee689bd0f732312560c83ad8a0baf"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "eaaf58d6a8a7c3cbb782fa4957660d06"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 0.0,
+    "tool_selection": 0.0
+   },
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "7": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "85d649894d7869888c5727419a0ef9f5"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "251a0541e7e93fa92e2066eb473410a0"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.0,
+      "tool_selection": 0.0
+     },
+     "trace_id": "4807da755293e50eb92f2e91e37e8785"
+    }
+   ],
+   "fails": [
+    "missing fact 'MDM|MFA|end date|named'"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 0.0,
+    "tool_selection": 0.0
+   },
+   "status": "completed",
+   "tools": [
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "8": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "674ce5826d6dfe948903f8c494925a8b"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "913f8686489d1554da5db4b4081e0fe6"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "79832763a4767df0274336350967181d"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "forbidden_avoided": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  },
+  "9": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "09ac131c2a7b32f15fd6391be4a1d3cd"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "efe6f9be0644c6d835765d25c9764708"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "c93551695542e6d5cc3f831238f711a8"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "forbidden_avoided": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  }
+ },
+ "S4-constraint-carry": {
+  "1": {
+   "detail": [
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "940661007b1da882d2551a4238f218c6"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "bccf3951b56957b63e7bd89a7c77fb88"
+    },
+    {
+     "ok": false,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "tool_necessity": 0.0
+     },
+     "trace_id": "968945da1b085b9935fdd363de06d514"
+    }
+   ],
+   "fails": [
+    "tool use True != False"
+   ],
+   "passes": 0,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "tool_necessity": 0.0
+   },
+   "status": "completed",
+   "tools": [
+    "search_documents"
+   ]
+  },
+  "2": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "83480bb2fffba69bf07c536a1b0f5604"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "365b786e1a6276837bc7e1d2d8a66b73"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "5d1a3f5b89c941a42f7aea0167659a6f"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "3": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "fe357caa10fbd79e7971c94045cf4811"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "656343cefadac1b250820cc0442eecf4"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "f4511f48ebd55bb3200ba06908e209c9"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "status": "completed",
+   "tools": [
+    "check_software_subscription",
+    "check_software_subscription"
+   ]
+  },
+  "4": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "84d68352283e7c0fdb27472b4c6484f0"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "65cad7731a3082f5fcc8f438abaaf6bd"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "b1e96db81c0b864398f1a1c677c28a5c"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "5": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "7ba2ef8cdefbc8e6a60b9fe8b4c9c593"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "8c15022fc67d2870e71eec224b5654ef"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "218eb830a0c59fe07e336da743c34626"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  },
+  "6": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "e2a351902496b27202ba7971d128ae34"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "75db95bda79509ad61ddcbeb2f813992"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "forbidden_avoided": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 1.0,
+      "tool_selection": 1.0
+     },
+     "trace_id": "e26a6e49df6c43bd2e1ea0a3ccf519ef"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "forbidden_avoided": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 1.0,
+    "tool_selection": 1.0
+   },
+   "status": "completed",
+   "tools": [
+    "check_software_subscription"
+   ]
+  },
+  "7": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "894b5130db15124b17b77ec7adc6b7fd"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "3c12f04b8f3aef1b865479bbec8a1eb6"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "forbidden_avoided": 1.0
+     },
+     "trace_id": "1e6ce0665e4c2d89b23c71a5885c9a69"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "forbidden_avoided": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  },
+  "8": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.25,
+      "tool_selection": 0.0
+     },
+     "trace_id": "caab4b63853eb9642cfa1ddaf4e4f83e"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.3333333333333333,
+      "tool_selection": 0.0
+     },
+     "trace_id": "a52c15840dd02ecdfe2b8d0eba0f7f18"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "call_efficiency": 1.0,
+      "intent_accuracy": 1.0,
+      "tool_necessity": 0.25,
+      "tool_selection": 0.0
+     },
+     "trace_id": "1767f5fdce32e8746b1c3031e864b128"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "call_efficiency": 1.0,
+    "intent_accuracy": 1.0,
+    "tool_necessity": 0.28,
+    "tool_selection": 0.0
+   },
+   "status": "pending",
+   "tools": [
+    "get_employee",
+    "list_access_requests",
+    "search_documents",
+    "search_documents"
+   ]
+  },
+  "9": {
+   "detail": [
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "2b820bef9945bf2720bd8e44aedba038"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "ce04b825d6d6818f3fc4db6f05432c43"
+    },
+    {
+     "ok": true,
+     "scores": {
+      "intent_accuracy": 1.0
+     },
+     "trace_id": "f35834556f391595ad7d960bc6e33240"
+    }
+   ],
+   "fails": [],
+   "passes": 3,
+   "runs": 3,
+   "scores": {
+    "intent_accuracy": 1.0
+   },
+   "status": "completed",
+   "tools": []
+  }
+ }
+}

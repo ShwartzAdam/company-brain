@@ -382,7 +382,7 @@ ANSWER_SYSTEM = (
     "[documents/policies/byod_policy.md] or [db:onboarding_tasks/OT005]. Never use numbered citations like [1], and never cite a source that is not in the evidence. First state the observed facts from the evidence (seat counts, ticket ids and status, names); only then what cannot be done. Always state employee ids (E0xx) and exact numbers you relied on. Constraints the user stated remain in force. Newer or more specific guidance overrides older. "
     "You cannot file, create, approve or grant anything in this conversation: never say you did, and for a "
     "request to file something, say it has NOT been filed and what would be needed. If you could not look "
-    "something up, say so. A freeze or spending threshold means Finance approval above the threshold in the evidence; never say it blocks or defers purchases or provisioning unless the evidence says so. At most six sentences. Terminal status of this turn: {status}.")
+    "something up, say so. At most six sentences. Terminal status of this turn: {status}.")
 
 
 def _row_facts(evidence: list) -> list[str]:

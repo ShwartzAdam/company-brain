@@ -606,9 +606,7 @@ def test_guard_drops_only_the_claiming_sentence(scripted, hits, tmp_path):
     assert "MFA and device trust" in r.answer and "I have filed" not in r.answer
 
 
-def test_answer_prompt_has_today_the_request_subject_and_the_freeze_meaning(scripted, hits, tmp_path):  # first turn: a lookup is forced
-    from brain.graph import ANSWER_SYSTEM
-    assert "Finance approval above the threshold" in ANSWER_SYSTEM
+def test_answer_prompt_has_today_the_request_subject(scripted, hits, tmp_path):  # first turn: a lookup is forced
     b = scripted(plan("other", False, subject_name="Rachel Stein", system_name="Webex"), '{"tool":"search_documents","args":{"query":"webex"}}', '{"done":true}', "Draft: she needs Webex.")
     turn("E004", "Draft one sentence on why she needs Webex.", "t-g2", tmp_path, "UG_HR")
     body = next(c[0][0]["content"] for c in b.calls if c[0][0]["content"].startswith("Today:"))
