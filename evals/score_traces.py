@@ -1,8 +1,8 @@
 """Score a finished run FROM OUTSIDE, after the fact (lesson 11 ex.3): read each turn's trace back through the v2
 API, run trace_checks, and push scores onto the trace. A better check can re-score old runs.
 
-  python evals/score_traces.py evals/results/step5.json            # score + push
-  python evals/score_traces.py evals/results/step5.json --dry      # score, push nothing
+  python evals/score_traces.py evals/results/history/step5.json            # score + push
+  python evals/score_traces.py evals/results/history/step5.json --dry      # score, push nothing
   python evals/score_traces.py --selftest
 
 Traps handled (lesson 11): name every field group (no `io` = no tool arguments); the API lags writes, so an

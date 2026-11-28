@@ -737,7 +737,7 @@ def test_wi02_check_accepts_the_wordings_seen_live():
     assert all(has(answer, spec) for spec in case["required_facts"])
 
 
-# ---- offline items from GAPS-VS-COURSE.md ----
+# ---- offline items from docs/GAPS-VS-COURSE.md ----
 def test_claims_get_the_source_of_an_id_the_evidence_holds():
     from brain.claims import ground
     allowed = {"db:access_requests/AR001", "db:employees/E010", "documents/policies/byod_policy.md"}

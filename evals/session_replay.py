@@ -5,7 +5,7 @@ with an earlier file; a turn that passed before and fails now is a regression (e
 
   python evals/session_replay.py                         # all sessions, 1 run
   python evals/session_replay.py S1-quick-policy S3-intent-shift --runs 3 --label step2
-  python evals/session_replay.py --label step3 --baseline evals/results/step2.json
+  python evals/session_replay.py --label step3 --baseline evals/results/history/step2.json
 """
 import argparse
 import json
