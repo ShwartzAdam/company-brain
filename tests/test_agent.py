@@ -611,3 +611,28 @@ def test_answer_prompt_has_today_the_request_subject(scripted, hits, tmp_path): 
     turn("E004", "Draft one sentence on why she needs Webex.", "t-g2", tmp_path, "UG_HR")
     body = next(c[0][0]["content"] for c in b.calls if c[0][0]["content"].startswith("Today:"))
     assert body.startswith("Today: 2026-07-01") and "for Rachel Stein, system Webex" in body
+
+
+# ---- batch B ----
+def test_clean_citations_keeps_real_sources_only():
+    from brain.graph import clean_citations
+    t, d = clean_citations("Seats are 42 [db:software_subscriptions/SUB001] [1]. Freeze applies [Q3 SaaS freeze] [user instruction].",
+                           {"db:software_subscriptions/SUB001"})
+    assert t == "Seats are 42 [db:software_subscriptions/SUB001]. Freeze applies." and d == ["1", "Q3 SaaS freeze", "user instruction"]
+
+
+def test_placeholder_subjects_mean_the_caller():
+    from brain.graph import _GENERIC_SUBJECT
+    for s in ("unspecified", "[user's name not provided]", "unknown", "the user", "N/A"):
+        assert _GENERIC_SUBJECT.search(s), s
+    assert not _GENERIC_SUBJECT.search("Rachel Stein")
+
+
+def test_a_mentioned_freeze_forces_one_memo_lookup(scripted, hits, tmp_path):
+    scripted(plan("onboarding_status", False, relevant_constraints=["Q3 SaaS freeze"]),
+             '{"tool":"search_documents","args":{"query":"Q3 freeze"}}', '{"done":true}', "ok")
+    r = turn("E004", "Maya starts 2026-08-01 and the Q3 SaaS freeze applies. Pull up her record.", "t-f1", tmp_path, "UG_HR")
+    assert "freeze_memo_lookup_forced" in r.extra["fallbacks"] and "search_documents" in r.tool_sequence
+    scripted(plan("onboarding_status", False), "recalled")
+    r2 = turn("E004", "Remind me what freeze I mentioned.", "t-f1", tmp_path, "UG_HR")
+    assert r2.tool_sequence == [] and "freeze_memo_lookup_forced" not in r2.extra["fallbacks"]
