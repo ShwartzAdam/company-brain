@@ -33,5 +33,6 @@ def claims_done(text: str) -> list[str]:
 
 
 def answer_agrees(status: str, text: str) -> bool:
-    """Code-side check. Nothing in Step 2 can grant or file, so the answer may never say it did."""
+    """Code-side check. The model's prose never records an action: only release_write does, and the typed AccessDecision
+    (appended by code) reports it. So the model's own text may never say something was filed or granted."""
     return status in STATUSES and not claims_done(text)

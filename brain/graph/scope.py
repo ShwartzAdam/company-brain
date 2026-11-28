@@ -1,6 +1,7 @@
 """Scope: pure code, no model. Maps the classified intent to a scope and the tools visible this turn.
 Adapted from lesson-10 stage02_policy.py LOADOUTS/select_tools. Visibility is not authorization:
-write tools are added only through the gate, and the gate releases nothing yet."""
+write tools are added only through the gate, and a write is released only inside server/tools.py
+release_write, after the gate's consent and recorded-approval checks pass."""
 from brain.graph.plan import TurnPlan
 
 WRITE_TOOLS = {"create_access_request", "create_ticket", "request_approval", "release_access", "record_consent"}

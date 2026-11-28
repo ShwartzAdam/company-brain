@@ -28,7 +28,8 @@ class WebexPort(Protocol):
 
 
 class PendingWebexPort:
-    """Step 3 stand-in: records calls, returns pending, writes nothing. Step 4 replaces it with the real workflow."""
+    """Test double for the Webex port: records calls, returns pending, writes nothing. Production uses
+    brain/webex/webex.py WebexWorkflow; tests use this to check the handoff without touching the database."""
 
     def __init__(self):
         self.calls: list[WebexHandoff] = []

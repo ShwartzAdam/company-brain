@@ -1,6 +1,6 @@
 """classify -> scope -> gather -> answer, on LangGraph with a SQLite checkpointer.
 Adapted from lesson-10 02-dynamic-tool-loadout/graph.py. The graph reaches tools only through the
-Toolbox (MCP); it never touches the database. Model calls only through llm.complete."""
+Toolbox (MCP); it never touches the database. Every model call goes through brain/llm.py (complete or structured)."""
 import operator
 import re
 from typing import Annotated, TypedDict
@@ -420,7 +420,7 @@ async def answer(state: State, config) -> dict:
         text = " ".join(x for x in re.split(r"(?<=[.!?])\s+", text) if x not in bad).strip()
         text = (text + " " if text else "") + "I have not filed or granted anything; that needs the recorded approvals first."
     if plan.intent != "ambiguous" and status != "failed":
-        text, typed = ground(text, allowed)  # same set clean_citations used  # every sentence with the sources behind it; ids the evidence holds are cited by code
+        text, typed = ground(text, allowed)  # code attaches the source to each sentence naming an id the evidence holds; same `allowed` as clean_citations
         added = [x for c in typed.claims for x in c.added_by_code]
         if added or typed.uncited:
             _meta(citations_added_by_code=added, uncited_claims=typed.uncited[:5])
@@ -432,7 +432,8 @@ async def answer(state: State, config) -> dict:
         status = d.status
         text += " " + d.render()
     _io({"evidence_items": len(evid), "handoff": bool(h)}, {"answer": text[:400], "status": status})
-    # The assistant's own sentences are never stored as facts: facts come from the user's words only.
+    # Facts carried to the next turn are written by code: one line per tool row (row_facts) and FREEZE_NOTE once the memo
+    # was actually returned. The assistant's own sentences are never stored, so a wrong answer cannot become a fact.
     cl = checklist.build(evid)
     return {"answer": text, "status": status, "fallbacks": fallbacks, "checklist": cl.model_dump() if cl else None, "facts": _union(state.get("facts"), [*(FREEZE_NOTE for _ in [0] if any("saas_renewal_freeze" in x for e in evid for x in sources_of(e["result"]))),
                                                   *(f"{plan.intent}: {f}" for f in row_facts(evid))]), "rules": state["rules"],
