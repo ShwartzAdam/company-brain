@@ -55,3 +55,14 @@ Course habits that would have cut it: one session first, repeats only for the tu
    Offline-testable; live effect unmeasured.
 3. Gap 3: a planned query per corpus. Larger change; skip unless time allows.
 4. Gap 4: cap tool results in the planner view at 400 characters. Small, offline-testable.
+
+## G. Offline work done after this note (unit tests only, not measured live)
+- Gap 5: `brain/claims.py` types the answer as claims with sources; ids the evidence holds are cited by code; uncited numbers are listed.
+  The answer is still free text from the model, not a structured model output.
+- Gap 2: `memory_lines()` writes "Decision" and "Unresolved" lines from handoffs and pending approvals (code, recomputed each turn).
+  Not stored as facts; no distil node.
+- Gap 4: the planner's window never held tool results (messages are user and assistant text; rows live in facts, cut at 240 characters),
+  so the gap was smaller than stated. Assistant replies are now capped at 400 characters in the classify prompt.
+- Gap 3: classify can return a `search_query`; the forced search and the gather prompt use it. The `corpus` argument was already normalised in
+  `tools.search_documents` (an unknown or list value becomes no filter). No per-corpus plan.
+Risk to read live before trusting: the capped replies and the new classify field change classify's input and schema.

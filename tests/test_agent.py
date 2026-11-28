@@ -732,3 +732,43 @@ def test_wi02_check_accepts_the_wordings_seen_live():
               "not which employee holds a seat. E010's request is blocked [db:access_requests/AR001] and OT005 is blocked.")
     has = lambda text, spec: any(alt.strip().lower() in text.lower() for alt in spec.split("|"))  # same rule as session_replay.has  # noqa: E731
     assert all(has(answer, spec) for spec in case["required_facts"])
+
+
+# ---- offline items from GAPS-VS-COURSE.md ----
+def test_claims_get_the_source_of_an_id_the_evidence_holds():
+    from brain.claims import ground
+    allowed = {"db:access_requests/AR001", "db:employees/E010", "documents/policies/byod_policy.md"}
+    text, typed = ground("AR001 is blocked. Rachel waits [db:employees/E010]. The policy needs MFA [documents/policies/byod_policy.md]. "
+                         "There are 42 seats. Nothing was filed.", allowed)
+    assert text.startswith("AR001 is blocked [db:access_requests/AR001].")
+    assert [c.sources for c in typed.claims] == [["db:access_requests/AR001"], ["db:employees/E010"],
+                                                  ["documents/policies/byod_policy.md"], [], []]
+    assert typed.claims[0].added_by_code == ["db:access_requests/AR001"] and typed.claims[1].added_by_code == []
+    assert typed.uncited == ["There are 42 seats."]  # a number with no source is counted, not invented around
+
+
+def test_memory_lines_come_from_durable_state_and_stop_when_released():
+    from brain.graph import memory_lines
+    st = {"handoffs": {"k": {"system": "Webex", "subject_employee_id": "E001"}},
+          "pending": {"AR001": {"approval_ids": ["AP001", "AP002"], "employee_id": "E001", "system": "Webex", "released": False}}}
+    a, b = memory_lines(st)
+    assert "Webex access request for E001" in a and "not filed, approved or granted" in a
+    assert "AP001, AP002" in b and b.startswith("Unresolved")
+    st["pending"]["AR001"]["released"] = True
+    assert len(memory_lines(st)) == 1 and memory_lines({}) == []
+
+
+def test_classify_sees_decisions_and_the_planned_query_drives_the_forced_search(scripted, monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(retrieval, "search", lambda q, c, k=5, corpus=None, **kw: seen.append(q) or [
+        {"source": "documents/policies/byod_policy.md", "text": "MFA", "section": "s", "audience": "all", "score": 1.0}])
+    scripted(plan("policy_question", search_query="BYOD policy MFA device trust"), '{"done":true}', "MFA is needed [documents/policies/byod_policy.md].")
+    turn("E004", "hey, quick one, how do I get VPN on my own phone?", "t-q1", tmp_path, "UG_HR")
+    assert seen == ["BYOD policy MFA device trust"]
+
+
+def test_planner_rereads_only_a_capped_assistant_reply():
+    from brain.plan import classify_prompt
+    long = "x" * 900
+    body = classify_prompt([{"role": "user", "content": "q" * 900}, {"role": "assistant", "content": long}], "next", [], [])[0]["content"]
+    assert "x" * 400 + " ...[cut]" in body and "x" * 401 not in body and "q" * 900 in body

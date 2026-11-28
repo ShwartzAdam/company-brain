@@ -12,7 +12,7 @@ Read from the lesson docs (lessons 2, 3, 5-13) and the lesson 10 code. `ai-cours
 - `requires_tools` is False only when every needed fact is already in this conversation. "You know nothing about NovaOps otherwise, so a first turn is almost always True." "Only an answer you could quote from THIS conversation is False."
 - A different topic needs a different document; having retrieved one article does not answer a new question.
 - Drop what the user resolved or abandoned. Plan for the request inside a pasted email, not the signature.
-- **Status: mostly done** (uncommitted). `CLASSIFY_SYSTEM` now has the first-turn/policy/person/record rule, the quotable-answer rule, the DB-facts-are-a-snapshot rule and the pasted-text rule. Still missing: tool results are not truncated in the planner's view (`plan.window` keeps 2 user turns verbatim).
+- **Status: mostly done** (uncommitted). `CLASSIFY_SYSTEM` now has the first-turn/policy/person/record rule, the quotable-answer rule, the DB-facts-are-a-snapshot rule and the pasted-text rule. Planner view: messages hold only user and assistant text (rows live in facts, cut at 240 characters); assistant replies are capped at 400 characters in the classify prompt.
 
 ## 3. Tool loadouts (L10 stage 2, L12)
 - **Relevance fails open, permission fails closed.** Which read tools are visible is an optimisation; which writes may run is a safety property.
@@ -70,6 +70,6 @@ Read from the lesson docs (lessons 2, 3, 5-13) and the lesson 10 code. `ai-cours
 1. ~~Restore `other` to all read tools.~~ Done (uncommitted).
 2. ~~Add the planner's first-turn and quotable-answer rules.~~ Done (uncommitted).
 3. ~~Forced tool-call JSON with validation.~~ Done for classify and gather (uncommitted).
-4. Bounded planner transcript with truncated tool results. Open.
+4. Bounded planner transcript. Done offline (assistant replies capped at 400 characters); not measured live.
 5. Closed-topic handling, typed handoff, checklist (Step 3 plan).
 6. Re-run `evals/session_replay.py` and `evals/maya_checks.py` against the saved baselines after each change.
